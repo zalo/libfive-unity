@@ -2,6 +2,10 @@
 using UnityEngine;
 using libfivesharp;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 [ExecuteInEditMode]
 public class LFShape : MonoBehaviour {
   public LFTree tree;
@@ -16,11 +20,12 @@ public class LFShape : MonoBehaviour {
   public float resolution = 15;
 
   Material defaultMat;
-  Mesh cachedMesh;
+  [System.NonSerialized]
+  public Mesh cachedMesh;
 
   private void OnValidate() {
     transform.hasChanged = true;
-    transform.root.hasChanged = true;
+    if(transform.parent != null) transform.parent.hasChanged = true;
   }
 
   private void OnEnable() {
@@ -29,17 +34,28 @@ public class LFShape : MonoBehaviour {
   }
   private void OnDisable() {  Camera.onPreCull -= Draw; }
 
+  bool isRootNode;
   private void Draw(Camera camera) {
-    if (transform.hasChanged) transform.root.hasChanged = true;
-    if (transform != transform.root) return;
+    if (transform.hasChanged && transform.parent != null) transform.parent.hasChanged = true;
     if (defaultMat == null) defaultMat = new Material(Shader.Find("Diffuse"));
     if (cachedMesh == null) { cachedMesh = new Mesh(); }
-    if (tree == null || transform.hasChanged) {
+    isRootNode = transform.parent == null || transform.parent.GetComponent<LFShape>() == null;
+    if (tree == null || transform.hasChanged || cachedMesh.vertexCount == 0) {
       Evaluate();
       tree.RenderMesh(cachedMesh, new Bounds(transform.position, Vector3.one * boundsSize), resolution, vertexSplittingAngle);
     }
-    Matrix4x4 matrix = Matrix4x4.identity;
-    if (cachedMesh && defaultMat) Graphics.DrawMesh(cachedMesh, matrix, defaultMat, gameObject.layer, camera);
+    if (cachedMesh.vertexCount > 0 && defaultMat && isRootNode) {
+      Graphics.DrawMesh(cachedMesh, Matrix4x4.identity, defaultMat, gameObject.layer, camera);
+    }
+  }
+
+  private bool isSelected = false;
+  private void OnDrawGizmosSelected() {
+#if UNITY_EDITOR
+    if (isSelected != (isSelected = gameObject == Selection.activeGameObject)) transform.hasChanged = true;
+    Gizmos.color = new Color(0.368f, 0.466f, 0.607f, 0.251f);
+    if (isSelected && cachedMesh != null && cachedMesh.vertexCount > 0) Gizmos.DrawWireMesh(cachedMesh);
+#endif
   }
 
   public LFTree Evaluate() {
@@ -58,7 +74,7 @@ public class LFShape : MonoBehaviour {
         tree = evaluateNnary(op, trees.ToArray());
       }
       transform.hasChanged = false;
-      if (transform == transform.root && tree != null) {
+      if (isRootNode && tree != null) {
         tree = LFMath.Transform(tree, transform.localToWorldMatrix);
       } else {
         tree = LFMath.Transform(tree, transform.parent.localToWorldMatrix.inverse * transform.localToWorldMatrix);
@@ -122,3 +138,17 @@ public class LFShape : MonoBehaviour {
     Difference,
   }
 }
+
+#if UNITY_EDITOR
+//This allows the nodes in the model to be pickable!
+public class LFShapeGizmoDrawer {
+  [DrawGizmo(GizmoType.Pickable | GizmoType.NonSelected)]
+  static void DrawGizmoForMyScript(LFShape src, GizmoType gizmoType) {
+    Vector3 position = src.transform.position;
+    if (src.cachedMesh != null && src.cachedMesh.vertexCount > 0) {
+      Gizmos.color = new Color(0f, 0f, 0f, 0f);
+      Gizmos.DrawMesh(src.cachedMesh);
+    }
+  }
+}
+#endif
