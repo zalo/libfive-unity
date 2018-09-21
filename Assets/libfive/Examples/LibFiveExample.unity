@@ -206,10 +206,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cf8f3477d2899f4d81818af473167c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  op: 9
+  op: 10
   boundsSize: 2
-  vertexSplittingAngle: 20
-  resolution: 10
+  vertexSplittingAngle: 45
+  resolution: 8
 --- !u!4 &523134661
 Transform:
   m_ObjectHideFlags: 0
@@ -356,7 +356,7 @@ MonoBehaviour:
   op: 2
   boundsSize: 2
   vertexSplittingAngle: 180
-  resolution: 10
+  resolution: 4
 --- !u!1 &834083555
 GameObject:
   m_ObjectHideFlags: 0
@@ -477,7 +477,7 @@ MonoBehaviour:
   op: 0
   boundsSize: 2
   vertexSplittingAngle: 180
-  resolution: 10
+  resolution: 4
 --- !u!1 &1547208759
 GameObject:
   m_ObjectHideFlags: 0
@@ -521,7 +521,7 @@ MonoBehaviour:
   op: 0
   boundsSize: 2
   vertexSplittingAngle: 180
-  resolution: 10
+  resolution: 4
 --- !u!1 &1557883447
 GameObject:
   m_ObjectHideFlags: 0
@@ -565,4 +565,4 @@ MonoBehaviour:
   op: 0
   boundsSize: 2
   vertexSplittingAngle: 180
-  resolution: 10
+  resolution: 4
