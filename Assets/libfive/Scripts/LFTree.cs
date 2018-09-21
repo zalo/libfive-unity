@@ -70,7 +70,7 @@ namespace libfivesharp {
     /// res should be approximately half the model's smallest feature size; 
     /// subdivision halts when all sides of the region are below it. 
     /// </summary>
-    public void RenderMesh(Mesh meshToFill, Bounds bounds, float resolution = 100.0f) {
+    public void RenderMesh(Mesh meshToFill, Bounds bounds, float resolution = 12.0f, float vertexSplittingAngle = 20f) {
       libfive_region3 bound = new libfive_region3();
       bound.X.lower = bounds.min.x;
       bound.Y.lower = bounds.min.y;
@@ -103,7 +103,11 @@ namespace libfivesharp {
       meshToFill.SetVertices(vertices);
       meshToFill.SetTriangles(triangleIndices, 0);
       meshToFill.RecalculateBounds();
-      meshToFill.RecalculateNormals();
+      if (Mathf.Abs(vertexSplittingAngle) >= 180f) {
+        meshToFill.RecalculateNormals();
+      } else {
+        meshToFill.RecalculateNormals(vertexSplittingAngle);
+      }
 
       libfive.libfive_mesh_delete(libFiveMeshPtr);
     }
@@ -117,9 +121,9 @@ namespace libfivesharp {
     /// res should be approximately half the model's smallest feature size; 
     /// subdivision halts when all sides of the region are below it. 
     /// </summary>
-    public Mesh RenderMesh(Bounds bounds, float resolution = 100.0f) {
+    public Mesh RenderMesh(Bounds bounds, float resolution = 12.0f, float vertexSplittingAngle = 20f) {
       Mesh toRender = new Mesh();
-      RenderMesh(toRender, bounds, resolution);
+      RenderMesh(toRender, bounds, resolution, vertexSplittingAngle);
       return toRender;
     }
 
@@ -227,6 +231,13 @@ namespace libfivesharp {
       return Sphere(radius, Vector3.zero);
     }
 
+    /// <summary>Creates an ellipsoid</summary>
+    public static LFTree Ellipsoid(float radius, Vector3 focusA, Vector3 focusB) {
+      LFTree x = LFTree.x, y = LFTree.y, z = LFTree.z;
+      return Sqrt(Square(x - focusA.x) + Square(y - focusA.y) + Square(z - focusA.z)) + 
+             Sqrt(Square(x - focusB.x) + Square(y - focusB.y) + Square(z - focusB.z)) - radius;
+    }
+
     /// <summary>Creates a box with corners at "lower" and "upper"</summary>
     public static LFTree Box(Vector3 lower, Vector3 upper) {
       return Max(Max(
@@ -249,9 +260,19 @@ namespace libfivesharp {
       return Max(a, Max(lowerZ - z, z - upperZ));
     }
 
-    /// <summary>Hollows out this shape</summary>
-    public static LFTree Shell(LFTree t, float thickness) {
-      return Max(t, t - (thickness/2f));
+    /// <summary>Expands a shape by offset</summary>
+    public static LFTree Offset(LFTree t, float offset) {
+      return t - offset;
+    }
+
+    /// <summary>Expands shape b by the given offset then subtracts it from shape a</summary>
+    public static LFTree Clearance(LFTree a, LFTree b, float offset) {
+      return Difference(a, Offset(b, offset));
+    }
+
+    /// <summary>Returns a shell of a shape with the given offset</summary>
+    public static LFTree Shell(LFTree t, float offset) {
+      return Clearance(t, t, offset);
     }
 
     #endregion
@@ -262,6 +283,15 @@ namespace libfivesharp {
     /// <summary>Translates this shape</summary>
     public static LFTree Move(LFTree t, Vector3 translation) {
       return t.Remap(LFTree.x - translation.x, LFTree.y - translation.y, LFTree.z - translation.z);
+    }
+
+    public static LFTree Transform(LFTree t, Matrix4x4 matrix) {
+      Matrix4x4 invert = matrix.inverse;
+      LFTree x = LFTree.x, y = LFTree.y, z = LFTree.z;
+      return t.Remap(
+            invert.m00 * x + invert.m01 * y + invert.m02 * z + invert.m03,
+            invert.m10 * x + invert.m11 * y + invert.m12 * z + invert.m13,
+            invert.m20 * x + invert.m21 * y + invert.m22 * z + invert.m23);
     }
 
     /// <summary>Reflect the given shape about the x origin or an optional offset"</summary>
@@ -317,7 +347,7 @@ namespace libfivesharp {
     /// <summary>Returns the union of any number of shapes</summary>
     public static LFTree Union(params LFTree[] shapes) {
       LFTree unionedTree = shapes[0];
-      for (int i = 1; i < shapes.Length; i++) unionedTree = Min(unionedTree, shapes[i]);
+      if(shapes.Length>1) for(int i = 1; i < shapes.Length; i++) unionedTree = Min(unionedTree, shapes[i]);
       return unionedTree;
     }
 
@@ -333,6 +363,8 @@ namespace libfivesharp {
 
     /// <summary>Subtracts any number of shapes from the first argument</summary>
     public static LFTree Difference(params LFTree[] shapes) {
+      if (shapes.Length == 0) Debug.LogError("Difference can't be called without arguments!");
+      if (shapes.Length == 1) return shapes[0];
       LFTree[] subtractingShapes = new LFTree[shapes.Length - 1];
       for (int i = 1; i < shapes.Length; i++) subtractingShapes[i - 1] = shapes[i];
       return Intersection(shapes[0], Inverse(Union(subtractingShapes)));
