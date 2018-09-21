@@ -31,8 +31,12 @@ public class LFShape : MonoBehaviour {
   private void OnEnable() {
     Camera.onPreCull -= Draw;
     Camera.onPreCull += Draw;
+    if (transform.parent != null) transform.parent.hasChanged = true;
   }
-  private void OnDisable() {  Camera.onPreCull -= Draw; }
+  private void OnDisable() {
+    Camera.onPreCull -= Draw;
+    if (transform.parent != null) transform.parent.hasChanged = true;
+  }
 
   bool isRootNode;
   private void Draw(Camera camera) {
@@ -64,12 +68,12 @@ public class LFShape : MonoBehaviour {
         tree = evaluateNonary(op);
       } else if (op < LibFive_Operation.Union && transform.childCount > 0) {
         LFShape childShape = transform.GetChild(0).GetComponent<LFShape>();
-        if (childShape != null) tree = evaluateUnary(op, childShape.Evaluate());
+        if (childShape != null && childShape.isActiveAndEnabled) tree = evaluateUnary(op, childShape.Evaluate());
       } else {
         List<LFTree> trees = new List<LFTree>(transform.childCount);
         for (int i = 0; i < transform.childCount; i++) {
           LFShape childShape = transform.GetChild(i).GetComponent<LFShape>();
-          if (childShape != null) trees.Add(childShape.Evaluate());
+          if (childShape != null && childShape.isActiveAndEnabled) trees.Add(childShape.Evaluate());
         }
         tree = evaluateNnary(op, trees.ToArray());
       }
@@ -105,7 +109,7 @@ public class LFShape : MonoBehaviour {
     } else if (op == LibFive_Operation.Mirror) {
       return LFMath.SymmetricX(tree);
     } else if (op == LibFive_Operation.Shell) {
-      return LFMath.Shell(tree, -0.05f);
+      return LFMath.Shell(tree, 0.025f);
     }
     return LFTree.ConstVar;
   }

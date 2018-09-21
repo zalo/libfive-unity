@@ -260,19 +260,9 @@ namespace libfivesharp {
       return Max(a, Max(lowerZ - z, z - upperZ));
     }
 
-    /// <summary>Expands a shape by offset</summary>
-    public static LFTree Offset(LFTree t, float offset) {
-      return t - offset;
-    }
-
-    /// <summary>Expands shape b by the given offset then subtracts it from shape a</summary>
-    public static LFTree Clearance(LFTree a, LFTree b, float offset) {
-      return Difference(a, Offset(b, offset));
-    }
-
     /// <summary>Returns a shell of a shape with the given offset</summary>
     public static LFTree Shell(LFTree t, float offset) {
-      return Clearance(t, t, offset);
+      return Abs(t) - offset;
     }
 
     #endregion
