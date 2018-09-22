@@ -41,6 +41,8 @@ namespace libfivesharp {
       }
     }
     public static void ScheduleRenderLibFiveMesh(LFTree tree, Bounds bounds, float resolution, ref RenderJobPayload payload) {
+      UnityEngine.Profiling.Profiler.BeginSample("Schedule Render Mesh");
+
       libfive_region3 bound = new libfive_region3();
       bound.X.lower = bounds.min.x;
       bound.Y.lower = bounds.min.y;
@@ -61,9 +63,12 @@ namespace libfivesharp {
 
       payload.handle = curRenderJob.Schedule(payload.handle);
       JobHandle.ScheduleBatchedJobs();
+
+      UnityEngine.Profiling.Profiler.EndSample();
     }
 
     unsafe public static void CompleteRenderLibFiveMesh(ref RenderJobPayload payload, Mesh toFill, float vertexSplittingAngle = 180f) {
+      UnityEngine.Profiling.Profiler.BeginSample("Complete Rendering Mesh");
       if (payload != null && (*payload.libFiveMeshPtr) != IntPtr.Zero) {
         IntPtr meshPtr;
         unsafe { meshPtr = (*payload.libFiveMeshPtr); }
@@ -85,17 +90,14 @@ namespace libfivesharp {
           toFill.SetVertices(vertices);
           toFill.SetTriangles(triangleIndices, 0);
           toFill.RecalculateBounds();
-          if (Mathf.Abs(vertexSplittingAngle) >= 180f) {
-            toFill.RecalculateNormals();
-          } else {
-            toFill.RecalculateNormals(vertexSplittingAngle);
-          }
+          toFill.RecalculateNormals(vertexSplittingAngle);
 
           if (meshPtr != IntPtr.Zero) {
             libfive.libfive_mesh_delete(meshPtr);
           }
         }
       }
+      UnityEngine.Profiling.Profiler.EndSample();
     }
   }
 }

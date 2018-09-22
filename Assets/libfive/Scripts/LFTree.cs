@@ -103,11 +103,7 @@ namespace libfivesharp {
       meshToFill.SetVertices(vertices);
       meshToFill.SetTriangles(triangleIndices, 0);
       meshToFill.RecalculateBounds();
-      if (Mathf.Abs(vertexSplittingAngle) >= 180f) {
-        meshToFill.RecalculateNormals();
-      } else {
-        meshToFill.RecalculateNormals(vertexSplittingAngle);
-      }
+      meshToFill.RecalculateNormals(vertexSplittingAngle);
 
       libfive.libfive_mesh_delete(libFiveMeshPtr);
     }

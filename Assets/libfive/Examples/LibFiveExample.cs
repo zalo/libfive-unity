@@ -29,7 +29,7 @@ namespace libfivesharp {
 
         toRender.RenderMesh(meshToFill, new Bounds(Vector3.zero, Vector3.one * 3.1f), resolution);
 
-        if (sharpEdges) meshToFill.RecalculateNormals(30f);
+        if (sharpEdges) meshToFill.RecalculateNormals(25f);
       }
     }
   }
