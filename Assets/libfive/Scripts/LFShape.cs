@@ -38,47 +38,49 @@ namespace libfivesharp {
     [System.NonSerialized]
     public LFTree tree;
 
+    public float localTransformHash = 0f;
+
     //Refresh the mesh when its inspector has changed
     private void OnValidate() {
-      transform.hasChanged = true;
-      if (transform.parent != null) transform.parent.hasChanged = true;
-      if (transform.parent == null) transform.hasChanged = true;
+      LFShape parentShape = null; if (transform.parent != null && (parentShape = transform.parent.GetComponent<LFShape>()) != null) parentShape.localTransformHash = 0f;
+      if (transform.parent == null) localTransformHash = 0f;
     }
 
     //Subscribe to Camera callbacks for drawing an refresh the mesh OnEnable
     private void OnEnable() {
       Camera.onPreCull -= Draw;
       Camera.onPreCull += Draw;
-      if (transform.parent != null) transform.parent.hasChanged = true;
-      if (transform.parent == null) transform.hasChanged = true;
+      LFShape parentShape = null; if (transform.parent != null && (parentShape = transform.parent.GetComponent<LFShape>()) != null) parentShape.localTransformHash = 0f;
+      if (transform.parent == null) localTransformHash = 0f;
     }
     private void OnDisable() {
       Camera.onPreCull -= Draw;
-      if (transform.parent != null) transform.parent.hasChanged = true;
-      if (transform.parent == null) transform.hasChanged = true;
+      LFShape parentShape = null; if (transform.parent != null && (parentShape = transform.parent.GetComponent<LFShape>()) != null) parentShape.localTransformHash = 0f;
+      if (transform.parent == null) localTransformHash = 0f;
     }
 
     //Check if the mesh needs to be refreshed
     LFMeshRendering.RenderJobPayload payload;
     private void Update() {
-      UnityEngine.Profiling.Profiler.BeginSample("Update LibFive Mesh", this);
-      if (transform.hasChanged && transform.parent != null) transform.parent.hasChanged = true;
+      LFShape parentShape = null; if(transform.parent != null) parentShape = transform.parent.GetComponent<LFShape>();
+      if (transformHasChanged() && parentShape != null) parentShape.localTransformHash = 0f;
       if (material == null) material = new Material(Shader.Find("Diffuse"));
       if (cachedMesh == null) { cachedMesh = new Mesh(); cachedMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32; }
-      isRootNode = transform.parent == null || transform.parent.GetComponent<LFShape>() == null;
+      isRootNode = parentShape == null;
 
       if (payload != null && !payload.handle.Equals(default(Unity.Jobs.JobHandle)) && (!renderOnAnotherThread || payload.handle.IsCompleted)) {
         payload.handle.Complete();
         LFMeshRendering.CompleteRenderLibFiveMesh(ref payload, cachedMesh, vertexSplittingAngle);
         payload.handle = default(Unity.Jobs.JobHandle);
-      } else if ((tree == null || transform.hasChanged || cachedMesh.vertexCount == 0) && (payload == null || payload.handle.IsCompleted)) {
+      } else if ((tree == null || transformHasChanged() || cachedMesh.vertexCount == 0) && (payload == null || payload.handle.IsCompleted)) {
         Evaluate();
         //tree.RenderMesh(cachedMesh, new Bounds(transform.position, Vector3.one * boundsSize), resolution + 0.001f, vertexSplittingAngle);
         if (payload == null) payload = new LFMeshRendering.RenderJobPayload(ref tree);
+        UnityEngine.Profiling.Profiler.BeginSample("Update LibFive Mesh", this);
         LFMeshRendering.ScheduleRenderLibFiveMesh(tree, new Bounds(transform.position, Vector3.one * boundsSize), resolution + 0.001f, ref payload);
         if (!renderOnAnotherThread) Update();
+        UnityEngine.Profiling.Profiler.EndSample();
       }
-      UnityEngine.Profiling.Profiler.EndSample();
     }
 
     bool isRootNode;
@@ -95,7 +97,7 @@ namespace libfivesharp {
     private void OnDrawGizmosSelected() {
 #if UNITY_EDITOR
       UnityEngine.Profiling.Profiler.BeginSample("Draw LibFive Wireframe Gizmo", this);
-      if (isSelected != (isSelected = gameObject == Selection.activeGameObject)) transform.hasChanged = true;
+      if (isSelected != (isSelected = gameObject == Selection.activeGameObject)) localTransformHash = 0f;
       Gizmos.color = new Color(0.368f, 0.466f, 0.607f, 0.251f);
       if (isSelected && cachedMesh != null && cachedMesh.vertexCount > 0) {
         if (transform.parent != null && transform.parent.GetComponent<LFShape>()) Gizmos.matrix = transform.parent.localToWorldMatrix;
@@ -122,7 +124,7 @@ namespace libfivesharp {
           }
           tree = evaluateNnary(op, trees.ToArray());
         }
-        transform.hasChanged = false;
+        localTransformHash = computeLocalTransformHash();
         if (isRootNode && tree != null) {
           tree = LFMath.Transform(tree, transform.localToWorldMatrix);
         } else {
@@ -199,6 +201,15 @@ namespace libfivesharp {
       if (payload != null) {
         unsafe { Unity.Collections.LowLevel.Unsafe.UnsafeUtility.Free((payload.libFiveMeshPtr), Unity.Collections.Allocator.Persistent); }
       }
+    }
+
+    float computeLocalTransformHash() {
+      return transform.localPosition.x + transform.localPosition.y + transform.localPosition.z +
+             transform.localRotation.x + transform.localRotation.y + transform.localRotation.z + transform.localRotation.w +
+             transform.localScale.x + transform.localScale.y + transform.localScale.z;
+    }
+    bool transformHasChanged() {
+      return computeLocalTransformHash() != localTransformHash;
     }
   }
 
