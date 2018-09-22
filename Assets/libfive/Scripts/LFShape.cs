@@ -31,13 +31,13 @@ namespace libfivesharp {
     [Header("Experimental")]
     [Tooltip("Allows for a multi-frame delay for rendering; decouples rendering and framerate." +
       "Unity will complain about allocations more than a few frames old.")]
-    public bool renderOnAnotherThread = false;
+    public bool AsyncRender = false;
 
     [System.NonSerialized]
     public Mesh cachedMesh;
     [System.NonSerialized]
     public LFTree tree;
-
+    [System.NonSerialized]
     protected float localTransformHash = 0f;
 
     //Refresh the mesh when its inspector has changed
@@ -71,7 +71,7 @@ namespace libfivesharp {
       if (cachedMesh == null) { cachedMesh = new Mesh(); cachedMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32; }
       isRootNode = parentShape == null;
 
-      if (payload != null && !payload.handle.Equals(default(Unity.Jobs.JobHandle)) && (!renderOnAnotherThread || payload.handle.IsCompleted)) {
+      if (payload != null && !payload.handle.Equals(default(Unity.Jobs.JobHandle)) && (!AsyncRender || payload.handle.IsCompleted)) {
         payload.handle.Complete();
         LFMeshRendering.CompleteRenderLibFiveMesh(ref payload, cachedMesh, vertexSplittingAngle);
         payload.handle = default(Unity.Jobs.JobHandle);
@@ -81,7 +81,7 @@ namespace libfivesharp {
         if (payload == null) payload = new LFMeshRendering.RenderJobPayload(ref tree);
         UnityEngine.Profiling.Profiler.BeginSample("Update LibFive Mesh", this);
         LFMeshRendering.ScheduleRenderLibFiveMesh(tree, new Bounds(transform.position, Vector3.one * boundsSize), resolution + 0.001f, ref payload);
-        if (!renderOnAnotherThread) Update();
+        if (!AsyncRender) Update();
         UnityEngine.Profiling.Profiler.EndSample();
       }
     }

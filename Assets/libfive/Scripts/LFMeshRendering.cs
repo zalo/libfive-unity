@@ -99,5 +99,24 @@ namespace libfivesharp {
       }
       UnityEngine.Profiling.Profiler.EndSample();
     }
+
+    public static string createSTL(Mesh mesh, string solidName = "") {
+      Vector3[] vertices = mesh.vertices; int[] triangles = mesh.triangles;
+
+      System.Text.StringBuilder builder = new System.Text.StringBuilder();
+      builder.AppendLine("solid " + solidName);
+
+      for (int i = 0; i < triangles.Length; i+=3) {
+        builder.AppendLine("facet normal 0.0 0.0 0.0\r\nouter loop");
+        for (int j = 0; j < 3; j++) {
+          builder.AppendLine("vertex " + vertices[triangles[i + j]].x + " " + 
+                                         vertices[triangles[i + j]].y + " " + 
+                                         vertices[triangles[i + j]].z);
+        }
+        builder.AppendLine("endloop\r\nendfacet");
+      }
+      builder.AppendLine("endsolid");
+      return builder.ToString();
+    }
   }
 }

@@ -27,7 +27,7 @@ namespace libfivesharp {
           LFMath.ReflectXZ(cylinder),
           LFMath.ReflectYZ(cylinder));
 
-        toRender.RenderMesh(meshToFill, new Bounds(Vector3.zero, Vector3.one * 3.1f), resolution);
+        toRender.RenderMesh(meshToFill, new Bounds(Vector3.zero, Vector3.one * 3.1f), resolution, 20f);
 
         if (sharpEdges) meshToFill.RecalculateNormals(25f);
       }

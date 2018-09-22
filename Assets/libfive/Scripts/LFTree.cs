@@ -70,7 +70,7 @@ namespace libfivesharp {
     /// res should be approximately half the model's smallest feature size; 
     /// subdivision halts when all sides of the region are below it. 
     /// </summary>
-    public void RenderMesh(Mesh meshToFill, Bounds bounds, float resolution = 12.0f, float vertexSplittingAngle = 20f) {
+    public void RenderMesh(Mesh meshToFill, Bounds bounds, float resolution = 12.0f, float vertexSplittingAngle = 180f) {
       libfive_region3 bound = new libfive_region3();
       bound.X.lower = bounds.min.x;
       bound.Y.lower = bounds.min.y;
@@ -99,7 +99,7 @@ namespace libfivesharp {
       //The original indices were UInt32, so cast to and from those since Unity still needs them as ints
       for (int i = 0; i < triangleIndices.Length; i++) triangleIndices[i] = (int)((UInt32)triangleIndices[i]);
 
-      meshToFill.Clear();
+      meshToFill.Clear(); meshToFill.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
       meshToFill.SetVertices(vertices);
       meshToFill.SetTriangles(triangleIndices, 0);
       meshToFill.RecalculateBounds();
@@ -117,8 +117,8 @@ namespace libfivesharp {
     /// res should be approximately half the model's smallest feature size; 
     /// subdivision halts when all sides of the region are below it. 
     /// </summary>
-    public Mesh RenderMesh(Bounds bounds, float resolution = 12.0f, float vertexSplittingAngle = 20f) {
-      Mesh toRender = new Mesh();
+    public Mesh RenderMesh(Bounds bounds, float resolution = 12.0f, float vertexSplittingAngle = 180f) {
+      Mesh toRender = new Mesh(); toRender.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
       RenderMesh(toRender, bounds, resolution, vertexSplittingAngle);
       return toRender;
     }
