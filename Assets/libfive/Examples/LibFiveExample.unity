@@ -206,12 +206,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cf8f3477d2899f4d81818af473167c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  op: 10
+  op: 211
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
   vertexSplittingAngle: 25
   resolution: 8
   renderOnAnotherThread: 0
+  localTransformHash: 4
 --- !u!4 &523134661
 Transform:
   m_ObjectHideFlags: 0
@@ -355,12 +356,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cf8f3477d2899f4d81818af473167c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  op: 2
+  op: 3
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
   vertexSplittingAngle: 180
   resolution: 4
   renderOnAnotherThread: 0
+  localTransformHash: 4
 --- !u!1 &834083555
 GameObject:
   m_ObjectHideFlags: 0
@@ -478,12 +480,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cf8f3477d2899f4d81818af473167c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  op: 0
+  op: 1
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
   vertexSplittingAngle: 180
   resolution: 4
   renderOnAnotherThread: 0
+  localTransformHash: 3.9142137
 --- !u!1 &1547208759
 GameObject:
   m_ObjectHideFlags: 0
@@ -524,12 +527,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cf8f3477d2899f4d81818af473167c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  op: 0
+  op: 1
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
   vertexSplittingAngle: 180
   resolution: 4
   renderOnAnotherThread: 0
+  localTransformHash: 3.9142137
 --- !u!1 &1557883447
 GameObject:
   m_ObjectHideFlags: 0
@@ -570,9 +574,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cf8f3477d2899f4d81818af473167c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  op: 0
+  op: 1
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
   vertexSplittingAngle: 180
   resolution: 4
   renderOnAnotherThread: 0
+  localTransformHash: 3.5

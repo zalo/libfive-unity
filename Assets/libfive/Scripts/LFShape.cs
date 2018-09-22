@@ -38,7 +38,7 @@ namespace libfivesharp {
     [System.NonSerialized]
     public LFTree tree;
 
-    public float localTransformHash = 0f;
+    protected float localTransformHash = 0f;
 
     //Refresh the mesh when its inspector has changed
     private void OnValidate() {
@@ -52,6 +52,9 @@ namespace libfivesharp {
       Camera.onPreCull += Draw;
       LFShape parentShape = null; if (transform.parent != null && (parentShape = transform.parent.GetComponent<LFShape>()) != null) parentShape.localTransformHash = 0f;
       if (transform.parent == null) localTransformHash = 0f;
+#if UNITY_EDITOR
+      Undo.undoRedoPerformed += (() => { localTransformHash = 0f; if (parentShape != null) parentShape.localTransformHash = 0f; });
+#endif
     }
     private void OnDisable() {
       Camera.onPreCull -= Draw;
@@ -111,9 +114,9 @@ namespace libfivesharp {
     public LFTree Evaluate() {
       UnityEngine.Profiling.Profiler.BeginSample("Evaluate LibFive Tree", this);
       using (LFContext.Active = new Context()) {
-        if (op < LibFive_Operation.Transform) {
+        if (op > 0 && (int)op < 100) {
           tree = evaluateNonary(op);
-        } else if (op < LibFive_Operation.Union && transform.childCount > 0) {
+        } else if ((int)op < 200 && transform.childCount > 0) {
           LFShape childShape = transform.GetChild(0).GetComponent<LFShape>();
           if (childShape != null && childShape.isActiveAndEnabled) tree = evaluateUnary(op, childShape.Evaluate());
         } else {
@@ -124,6 +127,7 @@ namespace libfivesharp {
           }
           tree = evaluateNnary(op, trees.ToArray());
         }
+
         localTransformHash = computeLocalTransformHash();
         if (isRootNode && tree != null) {
           tree = LFMath.Transform(tree, transform.localToWorldMatrix);
@@ -180,21 +184,25 @@ namespace libfivesharp {
       return tree;
     }
 
-    public enum LibFive_Operation {
+    //Ops are numbered to preserve scene serializations
+    //Ops 0-99 reserved for Nonary
+    //Ops 100-199 reserved for Unary
+    //Ops 200-etc. reserved for Binary
+    public enum LibFive_Operation : int {
+      Transform = 0,
       //Nonary
-      Circle,
-      Sphere,
-      Box,
-      Cylinder,
+      Circle = 1,
+      Sphere = 2,
+      Box = 3,
+      Cylinder = 4,
       //Unary
-      Transform,
-      Inverse,
-      Mirror,
-      Shell,
+      Inverse = 106,
+      Mirror = 107,
+      Shell = 108,
       //Binary
-      Union,
-      Intersection,
-      Difference,
+      Union = 209,
+      Intersection = 210,
+      Difference = 211
     }
 
     private void OnDestroy() {
