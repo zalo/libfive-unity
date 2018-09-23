@@ -17,7 +17,7 @@ Supports operator overloading, tons of convenience functions, Context-based auto
 -Save often! The plugin has been known to crash Unity from time to time!
 
 
-<img src="https://i.imgur.com/BuKbAwc.gif">
+<img src="https://i.imgur.com/XR8HxoL.gif">" <img src="https://i.imgur.com/BuKbAwc.gif">
 
 
 <img src="https://i.imgur.com/F6M2teg.png">
