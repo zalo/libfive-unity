@@ -337,7 +337,7 @@ namespace libfivesharp {
       return unionedTree;
     }
 
-    /// <summary>Returns the union of any number of shapes</summary>
+    /// <summary>Returns the intersection of any number of shapes</summary>
     public static LFTree Intersection(params LFTree[] shapes) {
       LFTree intersectedTree = shapes[0];
       for (int i = 1; i < shapes.Length; i++) intersectedTree = Max(intersectedTree, shapes[i]);
