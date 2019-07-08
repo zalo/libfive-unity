@@ -171,7 +171,7 @@ namespace libfivesharp {
     }
 
     LFTree evaluateNnary(LibFive_Operation op, params LFTree[] trees) {
-      if (trees.Length > 0 || trees[0] == null) {
+      if (trees.Length > 0 && trees[0] != null) {
         if (trees.Length == 1) return trees[0];
         if (op == LibFive_Operation.Union) {
           return LFMath.Union(trees);
@@ -179,6 +179,8 @@ namespace libfivesharp {
           return LFMath.Intersection(trees);
         } else if (op == LibFive_Operation.Difference) {
           return LFMath.Difference(trees);
+        } else if (op == LibFive_Operation.Blend) {
+          return LFMath.Blend(0.1f, trees);
         }
       }
       return tree;
@@ -202,7 +204,8 @@ namespace libfivesharp {
       //Binary
       Union = 209,
       Intersection = 210,
-      Difference = 211
+      Difference = 211,
+      Blend = 212
     }
 
     private void OnDestroy() {

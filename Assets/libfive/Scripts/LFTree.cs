@@ -356,6 +356,17 @@ namespace libfivesharp {
       return Intersection(shapes[0], Inverse(Union(subtractingShapes)));
     }
 
+    /// <summary>Returns the blend of two shapes</summary>
+    public static LFTree Blend(LFTree a, LFTree b, float blendAmount = 0.5f) {
+      return Union(a, b, (Sqrt(Abs(a))) + (Sqrt(Abs(b))) - blendAmount);
+    }
+    /// <summary>Returns the blend of any number of shapes</summary>
+    public static LFTree Blend(float blendAmount = 0.5f, params LFTree[] shapes) {
+      LFTree blendedTree = shapes[0];
+      for (int i = 1; i < shapes.Length; i++) blendedTree = Blend(blendedTree, shapes[i], blendAmount);
+      return blendedTree;
+    }
+
     #endregion
   }
 }
