@@ -36,11 +36,11 @@ public static class LFNormalCalculation {
     toFill.RecalculateNormals();
 
     if (vertexSplittingAngle < 180f) {
-      NativeArray<Vector3> vertices = new NativeArray<Vector3>(toFill.vertices, Allocator.Temp);
-      int[] tris = toFill.triangles; NativeArray<Vector3Int> triangles = new NativeArray<Vector3Int>(tris.Length / 3, Allocator.Temp);
+      NativeArray<Vector3> vertices = new NativeArray<Vector3>(toFill.vertices, Allocator.TempJob);
+      int[] tris = toFill.triangles; NativeArray<Vector3Int> triangles = new NativeArray<Vector3Int>(tris.Length / 3, Allocator.TempJob);
       for (int i = 0; i < triangles.Length; i++) triangles[i] = new Vector3Int(tris[i * 3], tris[(i * 3) + 1], tris[(i * 3) + 2]);
-      NativeArray<byte> triangleIndicesToSplit = new NativeArray<byte>(new byte[tris.Length], Allocator.Temp);
-      NativeArray<Vector3> normals = new NativeArray<Vector3>(toFill.normals, Allocator.Temp);
+      NativeArray<byte> triangleIndicesToSplit = new NativeArray<byte>(new byte[tris.Length], Allocator.TempJob);
+      NativeArray<Vector3> normals = new NativeArray<Vector3>(toFill.normals, Allocator.TempJob);
 
       if (vertices.Length > 0 && triangles.Length > 0 && normals.Length > 0) {
         JobHandle splitNormals = new SplitNormalsJob() {
