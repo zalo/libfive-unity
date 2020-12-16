@@ -6,6 +6,8 @@ libfive-unity
 Supports operator overloading, tons of convenience functions, Context-based automatic disposal of unmanaged resources, and a strong editor interface.
 
 ### Warning
+-This project, while hopefully useful to you, is currently not actively supported, and PRs will not be accepted.
+
 -Only basic mesh rendering is implemented for the output; Use the unwrapped, untested functions in `libfivesharp.libFiveInternal` at your peril!
 
 -Many of the convenience functions found in `libfive-Studio` have not been reimplemented here.
