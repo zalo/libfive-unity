@@ -31,14 +31,16 @@ $text = Get-Content $cm -Raw
 $text = $text -replace '/MD/', '/MT' -replace '/MDd', '/MTd' -replace ' /arch:AVX2', '' -replace '/WX ', ''
 Set-Content $cm $text -NoNewline
 
-cmake -S $Here -B $Build -A x64 `
-  -DLIBFIVE_SOURCE_DIR="$Src" `
-  -DCMAKE_TOOLCHAIN_FILE="$Vcpkg\scripts\buildsystems\vcpkg.cmake" `
-  -DVCPKG_TARGET_TRIPLET=$Triplet `
-  -DVCPKG_OVERLAY_TRIPLETS="$Here\triplets" `
-  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW `
-  -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded`$<`$<CONFIG:Debug>:Debug>"
+# Every -D argument is quoted as a whole: PowerShell does not expand variables inside an
+# unquoted token that starts with "-".
+cmake -S "$Here" -B "$Build" -A x64 `
+  "-DLIBFIVE_SOURCE_DIR=$Src" `
+  "-DCMAKE_TOOLCHAIN_FILE=$Vcpkg\scripts\buildsystems\vcpkg.cmake" `
+  "-DVCPKG_TARGET_TRIPLET=$Triplet" `
+  "-DVCPKG_OVERLAY_TRIPLETS=$Here\triplets" `
+  "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW" `
+  '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-cmake --build $Build --config $Config --target libfive --parallel
+cmake --build "$Build" --config $Config --target libfive --parallel
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Get-ChildItem (Join-Path $Build "libfive\libfive\src\$Config\libfive.dll")
