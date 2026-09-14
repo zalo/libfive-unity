@@ -1,0 +1,44 @@
+# Builds the libfive Unity plugin binary (libfive.dll) on Windows with MSVC + vcpkg.
+#
+#   native\build.ps1 [-Triplet x64-windows-static] [-Config Release]
+#
+# Environment:
+#   LIBFIVE_SOURCE_DIR  libfive checkout (default: native\libfive)
+#   VCPKG_ROOT          vcpkg checkout (default: $env:VCPKG_INSTALLATION_ROOT, then C:\vcpkg)
+#   BUILD_DIR           build tree (default: native\build\<triplet>)
+#
+# Output: $BUILD_DIR\libfive\libfive\src\<Config>\libfive.dll
+param(
+  [string]$Triplet = "x64-windows-static",
+  [string]$Config = "Release"
+)
+$ErrorActionPreference = "Stop"
+$Here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Src = if ($env:LIBFIVE_SOURCE_DIR) { $env:LIBFIVE_SOURCE_DIR } else { Join-Path $Here "libfive" }
+$Vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } elseif ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
+$Build = if ($env:BUILD_DIR) { $env:BUILD_DIR } else { Join-Path $Here "build\$Triplet" }
+
+if (-not (Test-Path (Join-Path $Src "CMakeLists.txt"))) {
+  throw "libfive sources not found at $Src (clone https://github.com/libfive/libfive there)"
+}
+
+# libfive hard-codes MSVC flags that are wrong for a redistributable plugin. Patch them:
+#   /MD  -> /MT        static CRT, so users don't need a matching VC++ redistributable
+#   /arch:AVX2 removed so the DLL runs on any x64 CPU
+#   /WX removed        newer compilers' warnings must not fail the build
+$cm = Join-Path $Src "CMakeLists.txt"
+$text = Get-Content $cm -Raw
+$text = $text -replace '/MD/', '/MT' -replace '/MDd', '/MTd' -replace ' /arch:AVX2', '' -replace '/WX ', ''
+Set-Content $cm $text -NoNewline
+
+cmake -S $Here -B $Build -A x64 `
+  -DLIBFIVE_SOURCE_DIR="$Src" `
+  -DCMAKE_TOOLCHAIN_FILE="$Vcpkg\scripts\buildsystems\vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=$Triplet `
+  -DVCPKG_OVERLAY_TRIPLETS="$Here\triplets" `
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW `
+  -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded`$<`$<CONFIG:Debug>:Debug>"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cmake --build $Build --config $Config --target libfive --parallel
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Get-ChildItem (Join-Path $Build "libfive\libfive\src\$Config\libfive.dll")

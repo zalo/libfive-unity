@@ -34,3 +34,20 @@ sysinfo.txt
 # Builds
 *.apk
 *.unitypackage
+
+# Unity 2019+ / Unity 6
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+.vsconfig
+*.csproj.user
+Packages/packages-lock.json
+
+# Native build tree (see native/README)
+native/build/
+native/libfive/
+native/vcpkg_installed/
+
+# The .NET harness project is not a Unity-generated csproj
+!tools/harness/harness.csproj

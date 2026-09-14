@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Headless check of the libfive-unity C# sources without a Unity installation.
+
+    The Stubs/ folder contains minimal stand-ins for the UnityEngine / UnityEditor / Unity.Collections
+    / Unity.Jobs / Unity.Burst / Unity.Mathematics / NUnit APIs the project uses (jobs run
+    synchronously, NativeArray is a managed byte buffer). Everything under Assets/libfive is compiled
+    against them, and Program.cs runs the [Test] methods, including the native binding tests when a
+    libfive shared library is available.
+
+      dotnet run -c Release                          # uses ../../native/build/x64-linux/.../libfive.so if present
+      dotnet run -c Release -p:LibfiveNative=/path/to/libfive.so
+      dotnet run -c Release Sphere                   # only tests whose name contains "Sphere"
+
+    This catches compile errors, binding/marshalling mistakes and algorithm regressions, but it is not
+    a substitute for opening the project in Unity: the stubs approximate Unity's behaviour.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>UNITY_EDITOR;ENABLE_UNITY_COLLECTIONS_CHECKS;UNITY_INCLUDE_TESTS</DefineConstants>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS0649;CS0169;CS0414;CS0067;CS0108;CS8981;CS0618;CS0660;CS0661</NoWarn>
+    <RepoRoot>$(MSBuildProjectDirectory)/../..</RepoRoot>
+    <LibfiveNative Condition="'$(LibfiveNative)' == ''">$(RepoRoot)/native/build/x64-linux/libfive/libfive/src/libfive.so</LibfiveNative>
+  </PropertyGroup>
+  <!-- dotnet build -p:PlayerBuild=true compiles only the runtime assembly the way a player build would
+       (no UNITY_EDITOR, no collections safety checks, no editor or test scripts). -->
+  <PropertyGroup Condition="'$(PlayerBuild)' == 'true'">
+    <DefineConstants></DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/*.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="HarnessOnlyTests.cs" />
+    <Compile Include="$(RepoRoot)/Assets/libfive/**/*.cs" />
+    <Compile Remove="$(RepoRoot)/Assets/libfive/Scripts/Editor/**" Condition="'$(PlayerBuild)' == 'true'" />
+    <Compile Remove="$(RepoRoot)/Assets/libfive/Tests/**" Condition="'$(PlayerBuild)' == 'true'" />
+    <Compile Remove="HarnessOnlyTests.cs" Condition="'$(PlayerBuild)' == 'true'" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(LibfiveNative)')">
+    <None Include="$(LibfiveNative)" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

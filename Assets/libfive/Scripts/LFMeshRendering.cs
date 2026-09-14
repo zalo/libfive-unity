@@ -1,122 +1,116 @@
-﻿using System;
-using System.Runtime.InteropServices;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using Unity.Jobs;
+using System;
+using System.Diagnostics;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
-using libfivesharp;
+using Unity.Jobs;
+using UnityEngine;
 using libfivesharp.libFiveInternal;
 
 namespace libfivesharp {
-  public class LFMeshRendering {
-
-    unsafe public struct RenderLibFiveMeshJob : IJob {
-      [NativeDisableUnsafePtrRestriction]
-      public IntPtr treeToRender;
-      [ReadOnly]
-      public libfive_region3 bounds;
-      [ReadOnly]
+  /// <summary>
+  /// Meshes an <see cref="LFTree"/> on a job-system worker thread (libfive itself fans out to more
+  /// threads internally), then uploads the result to a Unity Mesh on the main thread via
+  /// <see cref="LFMeshBuilder"/>. Typical use:
+  /// <code>
+  /// job = LFMeshJob.Schedule(tree, bounds, resolution);
+  /// ...later, once job.IsCompleted (or immediately, to block)...
+  /// job.Complete(mesh, splitAngle);
+  /// job.Dispose();
+  /// </code>
+  /// The tree is borrowed: it must stay alive and undisposed until <see cref="Complete"/> or
+  /// <see cref="Dispose"/> has been called. Always dispose the job, even if you never complete it.
+  /// </summary>
+  public sealed class LFMeshJob : IDisposable {
+    struct RenderJob : IJob {
+      public IntPtr tree;
+      public libfive_region3 region;
       public float resolution;
-
-      [NativeDisableUnsafePtrRestriction]
-      public IntPtr* libFiveMeshPtr;
+      public int singleThreaded;
+      public NativeArray<IntPtr> result;
 
       public void Execute() {
-        if (treeToRender != IntPtr.Zero) {
-          (*libFiveMeshPtr) = libfive.libfive_tree_render_mesh(treeToRender, bounds, resolution);
-        }
+        if (tree == IntPtr.Zero) { result[0] = IntPtr.Zero; return; }
+        result[0] = singleThreaded != 0
+          ? libfive.libfive_tree_render_mesh_st(tree, region, resolution)
+          : libfive.libfive_tree_render_mesh(tree, region, resolution);
       }
     }
 
-    public static int unreleasedCounter = 0;
-    public unsafe class RenderJobPayload {
-      public JobHandle handle;
-      public IntPtr* libFiveMeshPtr;
-      public LFTree tree;
-      public RenderJobPayload(ref LFTree tree) {
-        unsafe { libFiveMeshPtr = (IntPtr*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<IntPtr>(), 4, Allocator.Persistent); }
-        this.tree = tree;
-      }
-    }
-    public static void ScheduleRenderLibFiveMesh(LFTree tree, Bounds bounds, float resolution, ref RenderJobPayload payload) {
-      UnityEngine.Profiling.Profiler.BeginSample("Schedule Render Mesh");
+    LFTree tree;
+    JobHandle handle;
+    NativeArray<IntPtr> result;
+    readonly Stopwatch stopwatch = new Stopwatch();
+    bool finished, disposed;
 
-      libfive_region3 bound = new libfive_region3();
-      bound.X.lower = bounds.min.x;
-      bound.Y.lower = bounds.min.y;
-      bound.Z.lower = bounds.min.z;
-      bound.X.upper = bounds.max.x;
-      bound.Y.upper = bounds.max.y;
-      bound.Z.upper = bounds.max.z;
+    /// <summary>The tree being meshed (borrowed).</summary>
+    public LFTree Tree { get { return tree; } }
+    public Bounds Bounds { get; private set; }
+    public float Resolution { get; private set; }
+    /// <summary>True once the worker has produced a result (or the job was completed/disposed).</summary>
+    public bool IsCompleted { get { return finished || disposed || handle.IsCompleted; } }
+    /// <summary>True after <see cref="Complete"/> has consumed the result.</summary>
+    public bool IsFinished { get { return finished; } }
+    /// <summary>Wall-clock time from scheduling to completion, in milliseconds.</summary>
+    public double ElapsedMilliseconds { get { return stopwatch.Elapsed.TotalMilliseconds; } }
 
-      RenderLibFiveMeshJob curRenderJob;
-      unsafe {
-        curRenderJob = new RenderLibFiveMeshJob() {
-          treeToRender = tree.tree,
-          bounds = bound,
-          resolution = resolution,
-          libFiveMeshPtr = payload.libFiveMeshPtr
-        };
-      }
+    LFMeshJob() { }
 
-      payload.handle = curRenderJob.Schedule(payload.handle);
+    /// <summary>Starts meshing <paramref name="tree"/> inside <paramref name="bounds"/> at <paramref name="resolution"/> cells per unit.</summary>
+    public static LFMeshJob Schedule(LFTree tree, Bounds bounds, float resolution, bool singleThreaded = false) {
+      if (tree == null) throw new ArgumentNullException(nameof(tree));
+      if (tree.IsDisposed) throw new ObjectDisposedException(nameof(tree));
+      var job = new LFMeshJob {
+        tree = tree,
+        Bounds = bounds,
+        Resolution = resolution,
+        result = new NativeArray<IntPtr>(1, Allocator.Persistent, NativeArrayOptions.ClearMemory)
+      };
+      job.stopwatch.Start();
+      job.handle = new RenderJob {
+        tree = tree.Handle,
+        region = LFTree.ToRegion(bounds),
+        resolution = resolution,
+        singleThreaded = singleThreaded ? 1 : 0,
+        result = job.result
+      }.Schedule();
       JobHandle.ScheduleBatchedJobs();
-
-      UnityEngine.Profiling.Profiler.EndSample();
+      return job;
     }
 
-    unsafe public static void CompleteRenderLibFiveMesh(ref RenderJobPayload payload, Mesh toFill, float vertexSplittingAngle = 180f) {
-      UnityEngine.Profiling.Profiler.BeginSample("Complete Rendering Mesh");
-      if (payload != null && (*payload.libFiveMeshPtr) != IntPtr.Zero) {
-        IntPtr meshPtr;
-        unsafe { meshPtr = (*payload.libFiveMeshPtr); }
-        if (meshPtr != IntPtr.Zero) {
-          //Marshal the mesh into vertex and triangle arrays and assign to unity mesh
-          libfive_mesh libFiveMesh = (libfive_mesh)Marshal.PtrToStructure(meshPtr, typeof(libfive_mesh));
-
-          float[] vertexFloats = new float[libFiveMesh.vert_count * 3];
-          int[] triangleIndices = new int[libFiveMesh.tri_count * 3];
-          Marshal.Copy(libFiveMesh.verts, vertexFloats, 0, vertexFloats.Length);
-          Marshal.Copy(libFiveMesh.tris, triangleIndices, 0, triangleIndices.Length);
-          List<Vector3> vertices = new List<Vector3>(vertexFloats.Length * 2 / 3);
-
-          for (int i = 0; i < vertexFloats.Length / 3; i++) vertices.Add(new Vector3(vertexFloats[(i * 3)], vertexFloats[(i * 3) + 1], vertexFloats[(i * 3) + 2]));
-          //The original indices were UInt32, so cast to and from those since Unity still needs them as ints
-          for (int i = 0; i < triangleIndices.Length; i++) triangleIndices[i] = (int)((UInt32)triangleIndices[i]);
-
-          toFill.Clear();
-          toFill.SetVertices(vertices);
-          toFill.SetTriangles(triangleIndices, 0);
-          toFill.RecalculateBounds();
-          toFill.RecalculateNormals(vertexSplittingAngle);
-
-          if (meshPtr != IntPtr.Zero) {
-            libfive.libfive_mesh_delete(meshPtr);
-          }
-        }
+    /// <summary>
+    /// Blocks until the worker is done (if it isn't already), builds <paramref name="target"/> from the
+    /// result and frees the native mesh. Returns false if the shape was empty inside the bounds (the
+    /// mesh is cleared) or the job was already consumed.
+    /// </summary>
+    public bool Complete(Mesh target, float vertexSplittingAngle = 180f) {
+      if (disposed) throw new ObjectDisposedException(nameof(LFMeshJob));
+      if (finished) return false;
+      handle.Complete();
+      finished = true;
+      stopwatch.Stop();
+      IntPtr nativeMesh = result[0];
+      result[0] = IntPtr.Zero;
+      try {
+        return target != null && LFMeshBuilder.Build(nativeMesh, target, Bounds, vertexSplittingAngle);
+      } finally {
+        if (nativeMesh != IntPtr.Zero) libfive.libfive_mesh_delete(nativeMesh);
+        GC.KeepAlive(tree);
       }
-      UnityEngine.Profiling.Profiler.EndSample();
     }
 
-    public static string createSTL(Mesh mesh, string solidName = "") {
-      Vector3[] vertices = mesh.vertices; int[] triangles = mesh.triangles;
-
-      System.Text.StringBuilder builder = new System.Text.StringBuilder();
-      builder.AppendLine("solid " + solidName);
-
-      for (int i = 0; i < triangles.Length; i+=3) {
-        builder.AppendLine("facet normal 0.0 0.0 0.0\r\nouter loop");
-        for (int j = 0; j < 3; j++) {
-          builder.AppendLine("vertex " + vertices[triangles[i + j]].x + " " + 
-                                         vertices[triangles[i + j]].y + " " + 
-                                         vertices[triangles[i + j]].z);
-        }
-        builder.AppendLine("endloop\r\nendfacet");
+    /// <summary>Waits for the worker if needed, discards any unconsumed result and frees resources.</summary>
+    public void Dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (!finished) {
+        handle.Complete();
+        finished = true;
+        stopwatch.Stop();
+        IntPtr nativeMesh = result[0];
+        if (nativeMesh != IntPtr.Zero) libfive.libfive_mesh_delete(nativeMesh);
       }
-      builder.AppendLine("endsolid");
-      return builder.ToString();
+      if (result.IsCreated) result.Dispose();
+      GC.KeepAlive(tree);
+      tree = null;
     }
   }
 }
