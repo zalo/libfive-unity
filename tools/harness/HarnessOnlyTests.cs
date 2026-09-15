@@ -25,7 +25,6 @@ namespace libfivesharp.Tests {
     }
 
     /// <summary>Prints the cost of feature normals relative to plain meshing. Not an assertion-heavy test.</summary>
-
     [Test]
     public void ProfileFeatureNormals() {
       if (!LFNative.SupportsFeatureNormals) Assert.Ignore("Plugin binary lacks the libfive-unity gradient helpers.");
