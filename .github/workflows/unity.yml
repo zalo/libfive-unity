@@ -91,6 +91,8 @@ jobs:
             Library-
       - uses: game-ci/unity-builder@v6
         env:
+          # Authenticates the game-ci CLI release lookup (unauthenticated GitHub API calls hit shared rate limits: 403).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}

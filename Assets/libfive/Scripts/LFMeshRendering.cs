@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
 using libfivesharp.libFiveInternal;
@@ -21,7 +22,9 @@ namespace libfivesharp {
   /// </summary>
   public sealed class LFMeshJob : IDisposable {
     struct RenderJob : IJob {
-      public IntPtr tree;
+      // A raw native handle: the job system rejects pointer-sized fields unless told the caller
+      // guarantees their lifetime (LFMeshJob keeps the LFTree alive until Complete/Dispose).
+      [NativeDisableUnsafePtrRestriction] public IntPtr tree;
       public libfive_region3 region;
       public float resolution;
       public int singleThreaded;

@@ -47,4 +47,5 @@ Assembly definitions: `Assets/libfive/libfivesharp.asmdef` (runtime, unsafe code
 - libfive is Z-up (`Cylinder`, `Cone`, `Extrude` work along Z); Unity meshes are uploaded without axis conversion and render correctly because the handedness flip preserves front faces. STL export writes coordinates as-is.
 - `resolution` everywhere means octree cells per unit length (libfive's `min_feature = 1/res`), not feature size.
 - Every asset under `Assets/` needs a `.meta` with a stable GUID (the example scene references `LFShape.cs.meta`'s GUID). New files: generate a `.meta` (see `native/install_plugin.py` for the plugin/folder templates) rather than letting Unity churn the repo.
+- Job structs may only hold `IntPtr`/pointer fields when marked `[NativeDisableUnsafePtrRestriction]`; the job system throws on schedule otherwise, and the harness stubs cannot catch it.
 - Native crashes come from lifetime mistakes: never call `libfive_tree_delete` on a handle you did not receive as a return value, never read a `libfive_mesh*` after `libfive_mesh_delete`, and never dispose an `LFTree` that a scheduled `LFMeshJob` still borrows.
