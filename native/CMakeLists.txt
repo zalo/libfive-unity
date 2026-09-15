@@ -38,6 +38,18 @@ endif()
 
 add_subdirectory("${LIBFIVE_SOURCE_DIR}" libfive)
 
+# libfive only adds Eigen's include directory from pkg-config (non-MSVC). With vcpkg on MSVC the
+# Eigen3 CMake package is found but its include path is never applied, so add it here.
+find_package(Eigen3 CONFIG QUIET)
+if(Eigen3_FOUND)
+  if(TARGET Eigen3::Eigen)
+    get_target_property(_eigen_includes Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(libfive SYSTEM PRIVATE ${_eigen_includes})
+  elseif(EIGEN3_INCLUDE_DIRS)
+    target_include_directories(libfive SYSTEM PRIVATE ${EIGEN3_INCLUDE_DIRS})
+  endif()
+endif()
+
 # Fold the standard library (shapes, CSG, transforms, text) into libfive itself.
 target_sources(libfive PRIVATE
   "${LIBFIVE_SOURCE_DIR}/libfive/stdlib/stdlib.cpp"

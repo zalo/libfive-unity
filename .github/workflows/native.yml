@@ -11,6 +11,13 @@
 #   * Windows x86_64  -> Assets/libfive/Plugins/Windows/x86_64/libfive.dll   (static CRT, no redist needed)
 #   * macOS universal -> Assets/libfive/Plugins/macOS/libfive.dylib          (arm64 + x86_64, ad-hoc signed)
 #   * Linux x86_64    -> Assets/libfive/Plugins/Linux/x86_64/libfive.so      (static libstdc++/libpng)
+#
+# Caching (both keyed so that branches fall back to master's caches):
+#   * vcpkg's binary cache holds the prebuilt dependencies (Boost, Eigen, libpng, zlib). It is
+#     restored at the start and saved at the end of the job even if the build failed, so a broken
+#     libfive build never throws away an hour of dependency compilation.
+#   * sccache (GitHub Actions cache backend) caches every libfive object file, so a rebuild with
+#     unchanged sources is mostly cache hits.
 name: Native libfive
 
 on:
@@ -23,6 +30,12 @@ on:
         type: string
         default: c9e97343e0af998cd1696e85583eccba95532b96
 
+# A newer push to the same branch supersedes a running build, except on master where a run may be
+# in the middle of publishing a release.
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 permissions:
   contents: read
 
@@ -31,6 +44,9 @@ env:
   # Must match "builtin-baseline" in native/vcpkg.json.
   VCPKG_COMMIT: 0c8f465c549616e897a34b9393054931fda6339c
   VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+  SCCACHE_GHA_ENABLED: "true"
+  CMAKE_C_COMPILER_LAUNCHER: sccache
+  CMAKE_CXX_COMPILER_LAUNCHER: sccache
 
 jobs:
   windows-x64:
@@ -47,12 +63,17 @@ jobs:
           repository: libfive/libfive
           ref: ${{ env.LIBFIVE_REF }}
           path: native/libfive
-      - name: Cache vcpkg binaries
-        uses: actions/cache@v6
+      - name: Restore vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: vcpkg-${{ runner.os }}-x64-windows-static-${{ env.VCPKG_COMMIT }}-${{ hashFiles('native/vcpkg.json', 'native/triplets/**') }}
           restore-keys: vcpkg-${{ runner.os }}-x64-windows-static-
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
       - name: Set up vcpkg
         shell: pwsh
         run: |
@@ -65,15 +86,23 @@ jobs:
         env:
           VCPKG_ROOT: ${{ runner.temp }}\vcpkg
         run: ./native/build.ps1 -Triplet x64-windows-static -Config Release
+      - name: Save vcpkg binary cache
+        if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+      - name: Compiler cache statistics
+        if: always()
+        run: sccache --show-stats
       - name: Check dependencies
         shell: pwsh
         run: |
-          $dll = "native/build/x64-windows-static/libfive/libfive/src/Release/libfive.dll"
-          $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -find "**\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
-          if ($dumpbin) { & $dumpbin /DEPENDENTS $dll } else { Write-Host "dumpbin not found; skipping dependency listing" }
+          $dll = "native/build/x64-windows-static/libfive.dll"
+          if (Get-Command dumpbin -ErrorAction SilentlyContinue) { dumpbin /DEPENDENTS $dll } else { Write-Host "dumpbin not on PATH; skipping" }
       - name: Stage plugin
         shell: pwsh
-        run: python native/install_plugin.py --platform windows-x64 --binary native/build/x64-windows-static/libfive/libfive/src/Release/libfive.dll --repo "$env:RUNNER_TEMP/stage"
+        run: python native/install_plugin.py --platform windows-x64 --binary native/build/x64-windows-static/libfive.dll --repo "$env:RUNNER_TEMP/stage"
       - uses: actions/upload-artifact@v7
         with:
           name: plugin-windows-x64
@@ -85,6 +114,9 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-latest
     timeout-minutes: 120
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
     steps:
       - uses: actions/checkout@v7
       - name: Check out libfive
@@ -93,12 +125,14 @@ jobs:
           repository: libfive/libfive
           ref: ${{ env.LIBFIVE_REF }}
           path: native/libfive
-      - name: Cache vcpkg binaries
-        uses: actions/cache@v6
+      - name: Restore vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: vcpkg-${{ runner.os }}-osx-${{ env.VCPKG_COMMIT }}-${{ hashFiles('native/vcpkg.json', 'native/triplets/**') }}
           restore-keys: vcpkg-${{ runner.os }}-osx-
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Set up vcpkg and pkg-config
         run: |
           mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
@@ -114,6 +148,15 @@ jobs:
         env:
           VCPKG_ROOT: ${{ runner.temp }}/vcpkg
         run: ./native/build.sh x64-osx -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+      - name: Save vcpkg binary cache
+        if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+      - name: Compiler cache statistics
+        if: always()
+        run: sccache --show-stats
       - name: Create universal binary
         run: |
           lipo -create \
@@ -148,12 +191,14 @@ jobs:
           repository: libfive/libfive
           ref: ${{ env.LIBFIVE_REF }}
           path: native/libfive
-      - name: Cache vcpkg binaries
-        uses: actions/cache@v6
+      - name: Restore vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: vcpkg-${{ runner.os }}-x64-linux-${{ env.VCPKG_COMMIT }}-${{ hashFiles('native/vcpkg.json', 'native/triplets/**') }}
           restore-keys: vcpkg-${{ runner.os }}-x64-linux-
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Set up vcpkg
         run: |
           mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
@@ -164,7 +209,16 @@ jobs:
       - name: Build
         env:
           VCPKG_ROOT: ${{ runner.temp }}/vcpkg
-        run: ./native/build.sh x64-linux
+        run: ./native/build.sh x64-linux -G Ninja
+      - name: Save vcpkg binary cache
+        if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+      - name: Compiler cache statistics
+        if: always()
+        run: sccache --show-stats
       - name: Check dependencies
         run: |
           ldd native/build/x64-linux/libfive/libfive/src/libfive.so
