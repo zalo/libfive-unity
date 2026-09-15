@@ -24,11 +24,15 @@ namespace libfivesharp {
   /// Corner normals come from one of two sources:
   /// <list type="bullet">
   /// <item><b>Feature (analytic) normals</b>: the gradient of the distance field, evaluated for every
-  /// triangle corner at a point nudged towards the triangle's centroid (see
-  /// <c>libfive_unity_mesh_corner_gradients</c>). On a smooth patch all corners around a vertex agree to
-  /// within curvature, and across a crease they differ by the true dihedral angle of the underlying
-  /// primitives, so the split decision follows the shape rather than the noisy face normals of dual
-  /// contouring's small or skinny triangles. Smooth normals are exact instead of averaged.</item>
+  /// triangle corner at points nudged towards the triangle's centroid (see
+  /// <c>libfive_unity_mesh_corner_gradients2</c>). With two samples per corner, at offsets a and 2a, the
+  /// gradient is extrapolated linearly back to the vertex (n0 = 2·n(a) − n(2a)), which cancels the
+  /// curvature term: on a smooth patch every corner around a vertex then reports the same normal no
+  /// matter how tightly curved the surface or how coarse the mesh, while across a crease neighbouring
+  /// corners still differ by the true dihedral angle of the underlying primitives. The split angle is
+  /// therefore a plain "creases shallower than this stay smooth" setting, and smooth normals are exact
+  /// instead of averaged. A corner whose two samples disagree by more than a few degrees straddles a
+  /// crease itself; it keeps its near sample un-extrapolated.</item>
   /// <item><b>Geometric normals</b>: the face normal of the triangle, used for arbitrary meshes
   /// (<see cref="RecalculateNormals"/>) and for corners whose gradient is zero or not finite.</item>
   /// </list>
@@ -65,17 +69,20 @@ namespace libfivesharp {
     /// and clears the mesh when the pointer is null or the mesh is empty.
     /// </summary>
     public static bool Build(IntPtr nativeMesh, Mesh target, Bounds bounds, float splitAngle) {
-      return Build(nativeMesh, IntPtr.Zero, target, bounds, splitAngle);
+      return Build(nativeMesh, IntPtr.Zero, 1, target, bounds, splitAngle);
     }
 
     /// <summary>
-    /// Builds <paramref name="target"/> from a libfive_mesh pointer plus optional per-corner gradients
-    /// (3 * tri_count libfive_vec3, as returned by libfive_unity_mesh_corner_gradients; pass
-    /// IntPtr.Zero for geometric normals). Frees neither buffer.
+    /// Builds <paramref name="target"/> from a libfive_mesh pointer plus optional per-corner gradients:
+    /// <paramref name="samplesPerCorner"/> = 1 for 3 * tri_count libfive_vec3 from
+    /// libfive_unity_mesh_corner_gradients, 2 for the two-offset layout from
+    /// libfive_unity_mesh_corner_gradients2 (offsets a and 2a). Pass IntPtr.Zero for geometric normals.
+    /// Frees neither buffer.
     /// </summary>
-    public static unsafe bool Build(IntPtr nativeMesh, IntPtr cornerGradients, Mesh target, Bounds bounds, float splitAngle) {
+    public static unsafe bool Build(IntPtr nativeMesh, IntPtr cornerGradients, int samplesPerCorner, Mesh target, Bounds bounds, float splitAngle) {
       if (target == null) throw new ArgumentNullException(nameof(target));
       if (nativeMesh == IntPtr.Zero) { Clear(target); return false; }
+      if (samplesPerCorner < 1 || samplesPerCorner > 2) throw new ArgumentOutOfRangeException(nameof(samplesPerCorner));
 
       libfive_mesh m = *(libfive_mesh*)nativeMesh;
       int vertexCount = (int)m.vert_count;
@@ -92,7 +99,7 @@ namespace libfivesharp {
       NativeArray<float3> gradients = default(NativeArray<float3>);
       if (cornerGradients != IntPtr.Zero) {
         gradients = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<float3>(
-          (void*)cornerGradients, triangleCount * 3, Allocator.None);
+          (void*)cornerGradients, triangleCount * 3 * samplesPerCorner, Allocator.None);
       }
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
       AtomicSafetyHandle positionsHandle = AtomicSafetyHandle.Create();
@@ -123,10 +130,12 @@ namespace libfivesharp {
     }
 
     /// <summary>
-    /// As <see cref="Build(NativeArray{float3}, NativeArray{uint}, Mesh, Bounds, float)"/>, with an optional
-    /// analytic gradient per corner (<paramref name="cornerGradients"/>[c] belongs to indices[c]; pass a
-    /// default/uncreated array for geometric normals). Corners whose gradient is zero or not finite use
-    /// their face normal.
+    /// As <see cref="Build(NativeArray{float3}, NativeArray{uint}, Mesh, Bounds, float)"/>, with optional
+    /// analytic gradients per corner (pass a default/uncreated array for geometric normals). With
+    /// indices.Length entries, <paramref name="cornerGradients"/>[c] is the gradient for corner c; with
+    /// 2 * indices.Length entries the second half holds a second sample per corner taken twice as far
+    /// from the vertex, and the two are extrapolated to the vertex. Corners whose gradient is zero or
+    /// not finite use their face normal.
     /// </summary>
     public static bool Build(NativeArray<float3> positions, NativeArray<uint> indices, NativeArray<float3> cornerGradients,
                              Mesh target, Bounds bounds, float splitAngle) {
@@ -136,6 +145,7 @@ namespace libfivesharp {
       int triangleCount = cornerCount / 3;
       if (vertexCount == 0 || triangleCount == 0) { Clear(target); return false; }
       bool useGradients = cornerGradients.IsCreated && cornerGradients.Length >= cornerCount;
+      bool twoSamples = useGradients && cornerGradients.Length >= 2 * cornerCount;
 
       // cos of the split angle; anything below -1 means "never split".
       float cosThreshold = splitAngle >= 180f ? -2f : math.cos(math.radians(math.max(splitAngle, 0f)));
@@ -167,8 +177,10 @@ namespace libfivesharp {
         JobHandle h = new FaceNormalsJob { positions = positions, indices = indices, faceNormals = faceNormals }
           .Schedule(triangleCount, 256);
         if (useGradients) {
-          h = new CornerNormalsFromGradientsJob { gradients = cornerGradients, faceNormals = faceNormals, cornerNormals = cornerNormals }
-            .Schedule(cornerCount, 512, h);
+          h = new CornerNormalsFromGradientsJob {
+            gradients = cornerGradients, faceNormals = faceNormals, cornerNormals = cornerNormals,
+            cornerCount = cornerCount, twoSamples = twoSamples ? 1 : 0, cosStraddle = math.cos(math.radians(StraddleAngle))
+          }.Schedule(cornerCount, 512, h);
         } else {
           h = new CornerNormalsFromFacesJob { faceNormals = faceNormals, cornerNormals = cornerNormals }
             .Schedule(cornerCount, 512, h);
@@ -331,21 +343,47 @@ namespace libfivesharp {
     }
 
     /// <summary>
-    /// Analytic corner normals: the normalized field gradient sampled for that corner, falling back to
-    /// the face normal where the gradient is zero, NaN or infinite (e.g. exactly on a min/max tie).
+    /// If a corner's two gradient samples differ by more than this angle (degrees) the segment between
+    /// them crosses a crease, and the corner keeps its near sample instead of extrapolating across it.
+    /// Smooth surfaces stay far below this: the samples are a fraction of a cell apart.
+    /// </summary>
+    public const float StraddleAngle = 15f;
+
+    /// <summary>
+    /// Analytic corner normals: the normalized field gradient for that corner, extrapolated to the vertex
+    /// from two samples when available (n0 = 2·n(a) − n(2a)), falling back to the face normal where the
+    /// gradient is zero, NaN or infinite (e.g. exactly on a min/max tie).
     /// </summary>
     [BurstCompile(FloatMode = FloatMode.Fast)]
     struct CornerNormalsFromGradientsJob : IJobParallelFor {
       [ReadOnly] public NativeArray<float3> gradients;
       [ReadOnly] public NativeArray<float3> faceNormals;
+      public int cornerCount;
+      public int twoSamples;
+      public float cosStraddle;
       [WriteOnly] public NativeArray<float3> cornerNormals;
 
-      public void Execute(int c) {
-        float3 g = gradients[c];
+      static bool Normalize(float3 g, out float3 n) {
         float len2 = math.lengthsq(g);
         // NaN compares false on both sides; +inf fails the upper bound.
         bool valid = len2 > 1e-24f && len2 < float.MaxValue;
-        cornerNormals[c] = valid ? g * math.rsqrt(len2) : faceNormals[c / 3];
+        n = valid ? g * math.rsqrt(len2) : float3.zero;
+        return valid;
+      }
+
+      public void Execute(int c) {
+        float3 na;
+        if (!Normalize(gradients[c], out na)) { cornerNormals[c] = faceNormals[c / 3]; return; }
+        if (twoSamples != 0) {
+          float3 nb;
+          if (Normalize(gradients[cornerCount + c], out nb) && math.dot(na, nb) >= cosStraddle) {
+            // Linear in the offset: the curvature term cancels and n0 is the gradient at the vertex.
+            float3 n0 = 2f * na - nb;
+            float len2 = math.lengthsq(n0);
+            if (len2 > 1e-12f) na = n0 * math.rsqrt(len2);
+          }
+        }
+        cornerNormals[c] = na;
       }
     }
 

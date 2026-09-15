@@ -45,7 +45,7 @@ namespace libfivesharp {
         long t1 = Stopwatch.GetTimestamp();
         result[0] = mesh;
         result[1] = gradients != 0 && mesh != IntPtr.Zero
-          ? libfive.libfive_unity_mesh_corner_gradients(tree, mesh, sampleOffset)
+          ? libfive.libfive_unity_mesh_corner_gradients2(tree, mesh, sampleOffset, 2f * sampleOffset)
           : IntPtr.Zero;
         ticks[0] = t1 - t0;
         ticks[1] = Stopwatch.GetTimestamp() - t1;
@@ -53,11 +53,13 @@ namespace libfivesharp {
     }
 
     /// <summary>
-    /// Where along the corner-to-centroid segment the gradient is sampled for feature normals (0 = at
-    /// the vertex, 1 = at the centroid). Large enough to land clearly on one side of a crease that the
-    /// vertex sits on, small enough to stay close to the vertex on curved surfaces.
+    /// Where along the corner-to-centroid segment the first gradient sample for feature normals is
+    /// taken (0 = at the vertex, 1 = at the centroid); the second sample is taken at twice this offset
+    /// and the two are extrapolated back to the vertex (see <see cref="LFMeshBuilder"/>). Large enough
+    /// to land clearly on one side of a crease that the vertex sits on, small enough that the gradient
+    /// varies linearly between the two samples on curved surfaces.
     /// </summary>
-    public static float CornerSampleOffset = 0.3f;
+    public static float CornerSampleOffset = 0.15f;
 
     LFTree tree;
     JobHandle handle;
@@ -135,7 +137,7 @@ namespace libfivesharp {
       result[1] = IntPtr.Zero;
       long buildStart = Stopwatch.GetTimestamp();
       try {
-        return target != null && LFMeshBuilder.Build(nativeMesh, gradients, target, Bounds, vertexSplittingAngle);
+        return target != null && LFMeshBuilder.Build(nativeMesh, gradients, 2, target, Bounds, vertexSplittingAngle);
       } finally {
         BuildMilliseconds = (Stopwatch.GetTimestamp() - buildStart) * 1000.0 / Stopwatch.Frequency;
         if (gradients != IntPtr.Zero) libfive.libfive_unity_free(gradients);

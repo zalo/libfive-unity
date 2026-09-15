@@ -329,6 +329,13 @@ namespace libfivesharp.libFiveInternal {
     [DllImport(LibraryName, EntryPoint = "libfive_unity_mesh_corner_gradients")]
     public static extern IntPtr libfive_unity_mesh_corner_gradients(IntPtr tree, IntPtr mesh, float nudge);
 
+    /// <summary>
+    /// Two-offset variant: 2 * 3 * tri_count libfive_vec3, the first 3 * tri_count sampled at <paramref name="offsetA"/>
+    /// towards each triangle's centroid, the second at <paramref name="offsetB"/>. Free with libfive_unity_free.
+    /// </summary>
+    [DllImport(LibraryName, EntryPoint = "libfive_unity_mesh_corner_gradients2")]
+    public static extern IntPtr libfive_unity_mesh_corner_gradients2(IntPtr tree, IntPtr mesh, float offsetA, float offsetB);
+
     [DllImport(LibraryName, EntryPoint = "libfive_unity_free")]
     public static extern void libfive_unity_free(IntPtr p);
     #endregion

@@ -130,4 +130,51 @@ LIBFIVE_UNITY_EXPORT libfive_vec3* libfive_unity_mesh_corner_gradients(libfive_t
     return out;
 }
 
+/*
+ *  Two-offset variant for discontinuity detection: returns 2 * 3 * tri_count gradients, the first
+ *  3 * tri_count sampled `offset_a` of the way from each corner towards its triangle's centroid and the
+ *  second 3 * tri_count sampled at `offset_b`. On a smooth surface the gradient varies linearly with the
+ *  offset (curvature), so the caller can extrapolate the gradient at the vertex itself; across a crease
+ *  the two samples of a corner agree with each other but not with the neighbouring corner's.
+ *  Release with libfive_unity_free. Returns NULL if the mesh is empty.
+ */
+LIBFIVE_UNITY_EXPORT libfive_vec3* libfive_unity_mesh_corner_gradients2(libfive_tree t,
+                                                                         const libfive_mesh* mesh,
+                                                                         float offset_a, float offset_b)
+{
+    if (t == nullptr || mesh == nullptr || mesh->tri_count == 0 || mesh->verts == nullptr ||
+        mesh->tris == nullptr) {
+        return nullptr;
+    }
+    const uint32_t corners = mesh->tri_count * 3;
+    const uint32_t total = corners * 2;
+    auto* points = static_cast<libfive_vec3*>(std::malloc(sizeof(libfive_vec3) * total));
+    auto* out = static_cast<libfive_vec3*>(std::malloc(sizeof(libfive_vec3) * total));
+    if (points == nullptr || out == nullptr) {
+        std::free(points);
+        std::free(out);
+        return nullptr;
+    }
+    for (uint32_t tri = 0; tri < mesh->tri_count; ++tri) {
+        const libfive_tri& idx = mesh->tris[tri];
+        const uint32_t ids[3] = {idx.a, idx.b, idx.c};
+        libfive_vec3 v[3];
+        for (int k = 0; k < 3; ++k) {
+            v[k] = ids[k] < mesh->vert_count ? mesh->verts[ids[k]] : libfive_vec3{0.f, 0.f, 0.f};
+        }
+        const libfive_vec3 c = {(v[0].x + v[1].x + v[2].x) / 3.f, (v[0].y + v[1].y + v[2].y) / 3.f,
+                                (v[0].z + v[1].z + v[2].z) / 3.f};
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t i = 3 * tri + k;
+            points[i] = {v[k].x + offset_a * (c.x - v[k].x), v[k].y + offset_a * (c.y - v[k].y),
+                         v[k].z + offset_a * (c.z - v[k].z)};
+            points[corners + i] = {v[k].x + offset_b * (c.x - v[k].x), v[k].y + offset_b * (c.y - v[k].y),
+                                   v[k].z + offset_b * (c.z - v[k].z)};
+        }
+    }
+    gradients_parallel(Tree(t), points, out, total, 8);
+    std::free(points);
+    return out;
+}
+
 LIBFIVE_UNITY_EXPORT void libfive_unity_free(void* p) { std::free(p); }

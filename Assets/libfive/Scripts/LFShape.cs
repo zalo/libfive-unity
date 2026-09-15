@@ -81,9 +81,11 @@ namespace libfivesharp {
     [Min(0.01f)]
     public float boundsSize = 2.5f;
 
-    [Tooltip("Edges whose faces meet at more than this angle (degrees) get hard, split normals. 180 = fully smooth.")]
+    [Tooltip("Creases sharper than this angle (degrees) get hard, split normals; shallower ones stay smooth. " +
+             "With feature normals this is the crease angle itself, independent of resolution and curvature, " +
+             "so tightly curved surfaces never split. 180 = never split.")]
     [Range(0.001f, 180f)]
-    public float vertexSplittingAngle = 180f;
+    public float vertexSplittingAngle = 10f;
 
     [Tooltip("Take normals (and the split decision) from the analytic gradient of the distance field, sampled per " +
              "triangle corner, instead of from the mesh's face normals. Creases are then found from the shape itself, " +

@@ -285,8 +285,34 @@ namespace libfivesharp.Tests {
             if (!referenced[i]) continue;
             worst = Mathf.Min(worst, Vector3.Dot(normals[i], verts[i].normalized));
           }
-          // Analytic normals are radial to well under a degree; averaged face normals are not.
-          Assert.Greater(worst, 0.9995f, "feature normal deviates from the radial direction");
+          // Extrapolated analytic normals are radial to a few hundredths of a degree; averaged face
+          // normals are off by whole degrees at this resolution.
+          Assert.Greater(worst, 0.99995f, "feature normal deviates from the radial direction");
+        }
+      } finally {
+        Object.DestroyImmediate(mesh);
+      }
+    }
+
+    [Test]
+    public void FeatureNormalsNeverSplitSmoothSurfacesHoweverTightlyCurved() {
+      RequireFeatureNormals();
+      var mesh = new Mesh();
+      try {
+        using (LFContext.Push()) {
+          // At 8 cells per unit these bend by 20-50 degrees per cell, far beyond any sensible split
+          // angle. Face normals would split them everywhere; extrapolated gradients agree exactly.
+          LFTree[] smooth = {
+            LFMath.Torus(0.8f, 0.12f),
+            LFMath.RoundedBox(-Vector3.one * 0.6f, Vector3.one * 0.6f, 0.15f),
+          };
+          var bounds = new Bounds(Vector3.zero, Vector3.one * 3f);
+          foreach (LFTree shape in smooth) {
+            Assert.IsTrue(shape.RenderMesh(mesh, bounds, 8f, 180f, true));
+            int smoothCount = mesh.vertexCount;
+            Assert.IsTrue(shape.RenderMesh(mesh, bounds, 8f, 5f, true));
+            Assert.AreEqual(smoothCount, mesh.vertexCount, "a 5 degree split angle must not split a smooth surface");
+          }
         }
       } finally {
         Object.DestroyImmediate(mesh);

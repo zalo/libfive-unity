@@ -424,9 +424,9 @@ namespace libfivesharp {
       IntPtr gradients = IntPtr.Zero;
       try {
         if (featureNormals && nativeMesh != IntPtr.Zero && LFNative.SupportsFeatureNormals) {
-          gradients = libfive.libfive_unity_mesh_corner_gradients(handle, nativeMesh, LFMeshJob.CornerSampleOffset);
+          gradients = libfive.libfive_unity_mesh_corner_gradients2(handle, nativeMesh, LFMeshJob.CornerSampleOffset, 2f * LFMeshJob.CornerSampleOffset);
         }
-        return LFMeshBuilder.Build(nativeMesh, gradients, target, bounds, vertexSplittingAngle);
+        return LFMeshBuilder.Build(nativeMesh, gradients, 2, target, bounds, vertexSplittingAngle);
       } finally {
         if (gradients != IntPtr.Zero) libfive.libfive_unity_free(gradients);
         if (nativeMesh != IntPtr.Zero) libfive.libfive_mesh_delete(nativeMesh);
