@@ -64,12 +64,25 @@ namespace Unity.Jobs {
     public static JobHandle CombineDependencies(JobHandle a, JobHandle b) => default;
     public static void ScheduleBatchedJobs() { }
   }
+  /// <summary>Mirrors the job system's reflection check: pointer-sized fields must be opted in.</summary>
+  public static class JobFieldCheck {
+    public static void Validate(Type jobType) {
+      foreach (var f in jobType.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)) {
+        bool pointerLike = f.FieldType == typeof(IntPtr) || f.FieldType == typeof(UIntPtr) || f.FieldType.IsPointer;
+        if (pointerLike && !f.IsDefined(typeof(Unity.Collections.LowLevel.Unsafe.NativeDisableUnsafePtrRestrictionAttribute), false))
+          throw new InvalidOperationException($"{jobType.Name}.{f.Name} uses unsafe Pointers which is not allowed. Add [NativeDisableUnsafePtrRestriction].");
+        if (f.FieldType.IsClass && f.FieldType != typeof(string))
+          throw new InvalidOperationException($"{jobType.Name}.{f.Name} is a reference type, which is not allowed in a job.");
+      }
+    }
+  }
   public static class IJobExtensions {
-    public static JobHandle Schedule<T>(this T job, JobHandle deps = default) where T : struct, IJob { job.Execute(); return default; }
-    public static void Run<T>(this T job) where T : struct, IJob { job.Execute(); }
+    public static JobHandle Schedule<T>(this T job, JobHandle deps = default) where T : struct, IJob { JobFieldCheck.Validate(typeof(T)); job.Execute(); return default; }
+    public static void Run<T>(this T job) where T : struct, IJob { JobFieldCheck.Validate(typeof(T)); job.Execute(); }
   }
   public static class IJobParallelForExtensions {
     public static JobHandle Schedule<T>(this T job, int length, int batch, JobHandle deps = default) where T : struct, IJobParallelFor {
+      JobFieldCheck.Validate(typeof(T));
       for (int i = 0; i < length; i++) job.Execute(i);
       return default;
     }
