@@ -16,6 +16,8 @@ concurrency:
 
 permissions:
   contents: read
+  # unity-test-runner publishes the results as a check run.
+  checks: write
 
 jobs:
   check-license:
