@@ -186,7 +186,7 @@ Assets/libfive/
   Tests/Editor/     EditMode tests (NUnit)
   Examples/         LibFiveExample scene and script
   package.json      UPM manifest
-native/             CMake wrapper, vcpkg manifest, build scripts, plugin installer
+native/             CMake wrapper, vcpkg manifest, build scripts, plugin installer, CI checks
 tools/harness/      headless .NET test harness with Unity API stubs
 .github/workflows/  native.yml (binaries + releases), unity.yml (tests + players)
 ```

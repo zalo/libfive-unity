@@ -253,6 +253,9 @@ jobs:
           pattern: plugin-*
           merge-multiple: true
           path: .
+      - name: Check assembly names against native plugin names
+        # A managed assembly named like the plugin (libfive.dll) makes Unity refuse the project.
+        run: python3 native/check_assembly_names.py
       - name: Bump version
         id: version
         run: |
