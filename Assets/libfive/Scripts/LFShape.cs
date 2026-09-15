@@ -88,7 +88,7 @@ namespace libfivesharp {
     [Tooltip("Octree cells per unit of length (the smallest feature libfive resolves is 1/resolution units). " +
              "Meshing cost grows roughly with the cube of this value.")]
     [Range(1f, 256f)]
-    public float resolution = 8f;
+    public float resolution = 12f;
 
     [Tooltip("Mesh on a worker thread and swap the result in when it is ready, instead of blocking Update.")]
     public bool AsyncRender = true;
