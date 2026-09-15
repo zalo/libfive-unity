@@ -24,6 +24,38 @@ namespace libfivesharp.Tests {
       }
     }
 
+    /// <summary>Prints the cost of feature normals relative to plain meshing. Not an assertion-heavy test.</summary>
+
+    [Test]
+    public void ProfileFeatureNormals() {
+      if (!LFNative.SupportsFeatureNormals) Assert.Ignore("Plugin binary lacks the libfive-unity gradient helpers.");
+      var mesh = new Mesh();
+      var bounds = new Bounds(Vector3.zero, Vector3.one * 3f);
+      using (LFContext.Push()) {
+        LFTree bore = LFMath.Cylinder(0.6f, 2f, new Vector3(0, 0, -1));
+        LFTree shape = LFMath.Difference(LFMath.Sphere(1f), bore, bore.ReflectXZ(), bore.ReflectYZ());
+        shape = LFMath.Blend(0.2f, shape, LFMath.Torus(1.1f, 0.1f).RotateX(Mathf.PI / 2));
+        shape = LFMath.Difference(shape, LFMath.Box(-Vector3.one * 0.5f, Vector3.one * 0.5f).RotateX(0.4f).RotateY(0.7f));
+        Console.WriteLine("    res  feature  triangles   libfive   gradients   build(harness, no Burst)  gradient/libfive");
+        foreach (float res in new[] { 16f, 32f, 64f }) {
+          foreach (bool feature in new[] { false, true }) {
+            double render = double.MaxValue, grads = double.MaxValue, build = double.MaxValue;
+            int tris = 0;
+            for (int rep = 0; rep < 3; rep++) {
+              using (LFMeshJob job = LFMeshJob.Schedule(shape, bounds, res, false, feature)) {
+                Assert.IsTrue(job.Complete(mesh, 30f));
+                render = Math.Min(render, job.RenderMilliseconds);
+                grads = Math.Min(grads, job.GradientMilliseconds);
+                build = Math.Min(build, job.BuildMilliseconds);
+                tris = LFMeshBuilder.LastTriangleCount;
+              }
+            }
+            Console.WriteLine($"    {res,3}  {feature,-7}  {tris,9:N0}  {render,7:F1}ms  {grads,8:F1}ms  {build,10:F1}ms               {(feature ? grads / render * 100 : 0),5:F0}%");
+          }
+        }
+      }
+    }
+
     [Test]
     public void RepeatedMeshingDoesNotLeakNativeMemory() {
       var mesh = new Mesh();

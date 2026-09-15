@@ -5,7 +5,7 @@ namespace libfivesharp {
   [CustomEditor(typeof(LFShape))]
   [CanEditMultipleObjects]
   public class LFShapeEditor : Editor {
-    SerializedProperty opProp, amountProp, textProp, materialProp, boundsProp, angleProp, resolutionProp, asyncProp;
+    SerializedProperty opProp, amountProp, textProp, materialProp, boundsProp, angleProp, featureProp, resolutionProp, asyncProp;
 
     void OnEnable() {
       opProp = serializedObject.FindProperty("op");
@@ -14,6 +14,7 @@ namespace libfivesharp {
       materialProp = serializedObject.FindProperty("material");
       boundsProp = serializedObject.FindProperty("boundsSize");
       angleProp = serializedObject.FindProperty("vertexSplittingAngle");
+      featureProp = serializedObject.FindProperty("featureNormals");
       resolutionProp = serializedObject.FindProperty("resolution");
       asyncProp = serializedObject.FindProperty("AsyncRender");
     }
@@ -39,6 +40,10 @@ namespace libfivesharp {
       if (shape.IsRoot) EditorGUILayout.PropertyField(materialProp);
       EditorGUILayout.PropertyField(boundsProp);
       EditorGUILayout.PropertyField(angleProp);
+      using (new EditorGUI.DisabledScope(!LFNative.SupportsFeatureNormals)) EditorGUILayout.PropertyField(featureProp);
+      if (featureProp.boolValue && LFNative.IsAvailable && !LFNative.SupportsFeatureNormals) {
+        EditorGUILayout.HelpBox("This plugin binary predates feature normals; geometric face normals are used.", MessageType.Info);
+      }
       EditorGUILayout.PropertyField(resolutionProp);
       EditorGUILayout.PropertyField(asyncProp);
       serializedObject.ApplyModifiedProperties();
@@ -52,8 +57,10 @@ namespace libfivesharp {
         int verts = shape.cachedMesh != null ? shape.cachedMesh.vertexCount : 0;
         int tris = shape.cachedMesh != null && shape.cachedMesh.subMeshCount > 0 ? (int)shape.cachedMesh.GetIndexCount(0) / 3 : 0;
         string state = shape.IsMeshing ? "meshing…" : (shape.IsDirty ? "pending" : "up to date");
-        info = string.Format("{0:N0} vertices, {1:N0} triangles, last mesh {2:F1} ms ({3})\nlibfive {4}{5}",
+        info = string.Format("{0:N0} vertices, {1:N0} triangles, last mesh {2:F1} ms ({3})\n" +
+                             "  libfive {4:F1} ms, gradients {5:F1} ms, mesh build {6:F1} ms\nlibfive {7}{8}",
           verts, tris, shape.LastMeshMilliseconds, state,
+          shape.LastRenderMilliseconds, shape.LastGradientMilliseconds, shape.LastBuildMilliseconds,
           string.IsNullOrEmpty(LFNative.Version) || LFNative.Version == "N/A" ? "" : LFNative.Version + " ",
           LFNative.Revision);
         EditorGUILayout.HelpBox(info, MessageType.None);

@@ -85,6 +85,11 @@ namespace libfivesharp {
     [Range(0.001f, 180f)]
     public float vertexSplittingAngle = 180f;
 
+    [Tooltip("Take normals (and the split decision) from the analytic gradient of the distance field, sampled per " +
+             "triangle corner, instead of from the mesh's face normals. Creases are then found from the shape itself, " +
+             "and smooth surfaces get exact normals. Costs one extra field evaluation per corner on the worker thread.")]
+    public bool featureNormals = true;
+
     [Tooltip("Octree cells per unit of length (the smallest feature libfive resolves is 1/resolution units). " +
              "Meshing cost grows roughly with the cube of this value.")]
     [Range(1f, 256f)]
@@ -114,6 +119,10 @@ namespace libfivesharp {
 
     /// <summary>Wall-clock milliseconds the last meshing job took (libfive + normal generation).</summary>
     public double LastMeshMilliseconds { get; private set; }
+    /// <summary>Breakdown of the last job: libfive meshing, corner gradient evaluation, Unity mesh build.</summary>
+    public double LastRenderMilliseconds { get; private set; }
+    public double LastGradientMilliseconds { get; private set; }
+    public double LastBuildMilliseconds { get; private set; }
     /// <summary>True while a meshing job for this node is in flight.</summary>
     public bool IsMeshing { get { return job != null; } }
     public bool IsDirty { get { return dirty; } }
@@ -222,9 +231,9 @@ namespace libfivesharp {
       Evaluate();
       if (tree == null) { LFMeshBuilder.Clear(cachedMesh); UpdateRenderer(true); return; }
       EnsureMesh();
-      using (var sync = LFMeshJob.Schedule(tree, LocalBounds, resolution)) {
+      using (var sync = LFMeshJob.Schedule(tree, LocalBounds, resolution, false, featureNormals)) {
         sync.Complete(cachedMesh, vertexSplittingAngle);
-        LastMeshMilliseconds = sync.ElapsedMilliseconds;
+        RecordTimings(sync);
       }
       UpdateRenderer(true);
     }
@@ -441,7 +450,7 @@ namespace libfivesharp {
         UpdateRenderer(true);
         return;
       }
-      job = LFMeshJob.Schedule(tree, LocalBounds, resolution);
+      job = LFMeshJob.Schedule(tree, LocalBounds, resolution, false, featureNormals);
       if (!AsyncRender) FinishJob();
       else RequestEditorUpdate();
     }
@@ -449,12 +458,19 @@ namespace libfivesharp {
     void FinishJob() {
       EnsureMesh();
       job.Complete(cachedMesh, vertexSplittingAngle);
-      LastMeshMilliseconds = job.ElapsedMilliseconds;
+      RecordTimings(job);
       job.Dispose();
       job = null;
       if (retiredTree != null) { retiredTree.Dispose(); retiredTree = null; }
       UpdateRenderer(true);
       RepaintEditor();
+    }
+
+    void RecordTimings(LFMeshJob j) {
+      LastMeshMilliseconds = j.ElapsedMilliseconds + j.BuildMilliseconds;
+      LastRenderMilliseconds = j.RenderMilliseconds;
+      LastGradientMilliseconds = j.GradientMilliseconds;
+      LastBuildMilliseconds = j.BuildMilliseconds;
     }
 
     void CancelJob() {

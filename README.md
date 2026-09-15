@@ -21,8 +21,9 @@ worker thread, and edit CSG trees directly in the Unity hierarchy.
   gizmos, undo, STL export, and rendering through a plain `MeshRenderer` in every pipeline.
 - **Fast, allocation-free meshing**: libfive runs on a worker thread; Burst jobs build the Unity
   mesh with zero-copy views of the native buffers and no per-frame garbage.
-- **Crisp normals**: smoothing-group normals with a configurable split angle, so hard edges stay
-  hard and curved surfaces stay smooth.
+- **Crisp normals from the field itself**: normals come from the analytic gradient of the distance
+  field, sampled per triangle corner, so creases are split where the shape really has them and
+  smooth surfaces get exact normals. Costs about a tenth of the meshing time.
 - **Safe lifetimes**: every tree is a single native reference with scoped disposal, double-dispose
   protection, and a finalizer backstop.
 - **Cross-platform binaries** for Windows x64, macOS (universal) and Linux x64, built, tested and
@@ -66,6 +67,8 @@ Mesh settings on every node:
 - **Bounds Size**: edge length of the cube that gets meshed. Geometry outside is clipped.
 - **Resolution**: octree cells per unit of length. Cost grows roughly with its cube.
 - **Vertex Splitting Angle**: edges sharper than this get hard normals. 180 keeps everything smooth.
+- **Feature Normals**: derive normals and the split decision from the field's gradient instead of the
+  mesh's face normals (on by default; see below).
 - **Async Render**: mesh on a worker thread and swap the result in when ready.
 
 In edit mode child nodes are meshed too so you can click and outline them in the Scene view; toggle
@@ -116,7 +119,14 @@ if (job.IsCompleted) {
   `tree.RenderSlice(rect, z, resolution)` returns 2D contours, `tree.RenderPixels(...)` a bitmap.
   `resolution` is always octree cells per unit of length.
 - **Normals**: `LFMeshBuilder` turns any triangle soup into a mesh with smoothing-group normals, and
-  `mesh.RecalculateNormals(splitAngle)` applies the same algorithm to an existing mesh.
+  `mesh.RecalculateNormals(splitAngle)` applies the same algorithm to an existing mesh. With
+  *feature normals* (the default for libfive meshes) the per-corner normal is the field's gradient,
+  evaluated by a batched helper compiled into the plugin (`native/shim`): on a smooth patch every
+  corner around a vertex agrees, across a crease they differ by the true dihedral angle, so the split
+  decision no longer depends on the noisy face normals of dual contouring's skinny triangles. Corners
+  whose gradient is undefined fall back to the face normal, and plugins built without the helper fall
+  back to geometric normals entirely (`LFNative.SupportsFeatureNormals`). `tree.Gradient(Vector3[])`
+  exposes the same batched evaluation.
 - **Export**: `LFMeshExport.WriteBinaryStl` / `WriteAsciiStl` write a Unity mesh with a transform
   applied, fixing the winding for mirroring transforms.
 - **Lifetimes**: an `LFTree` owns one native reference. Build inside `using (LFContext.Push())` and

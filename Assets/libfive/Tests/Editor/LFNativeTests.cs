@@ -242,6 +242,96 @@ namespace libfivesharp.Tests {
       }
     }
 
+    static void RequireFeatureNormals() {
+      if (!LFNative.SupportsFeatureNormals) Assert.Ignore("Plugin binary lacks the libfive-unity gradient helpers.");
+    }
+
+    [Test]
+    public void BatchedGradientsMatchPointwiseEvaluation() {
+      RequireFeatureNormals();
+      using (LFContext.Push()) {
+        LFTree shape = LFMath.Blend(0.3f, LFMath.Sphere(1f), LFMath.Box(new Vector3(0.5f, -0.2f, -0.2f), new Vector3(1.5f, 0.2f, 0.2f)));
+        var points = new Vector3[700];
+        var rng = new System.Random(7);
+        for (int i = 0; i < points.Length; i++) {
+          points[i] = new Vector3((float)rng.NextDouble() * 4f - 2f, (float)rng.NextDouble() * 4f - 2f, (float)rng.NextDouble() * 4f - 2f);
+        }
+        Vector3[] batched = shape.Gradient(points);
+        Assert.AreEqual(points.Length, batched.Length);
+        for (int i = 0; i < points.Length; i++) {
+          Vector3 single = shape.Gradient(points[i]);
+          Assert.AreEqual(single.x, batched[i].x, 1e-4f);
+          Assert.AreEqual(single.y, batched[i].y, 1e-4f);
+          Assert.AreEqual(single.z, batched[i].z, 1e-4f);
+        }
+      }
+    }
+
+    [Test]
+    public void FeatureNormalsAreExactOnASphere() {
+      RequireFeatureNormals();
+      var mesh = new Mesh();
+      try {
+        using (LFContext.Push()) {
+          LFTree sphere = LFMath.Sphere(1f);
+          Assert.IsTrue(sphere.RenderMesh(mesh, new Bounds(Vector3.zero, Vector3.one * 2.5f), 16f, 180f, true));
+          Assert.IsTrue(LFMeshBuilder.LastUsedFeatureNormals);
+          var verts = mesh.vertices;
+          var normals = mesh.normals;
+          var referenced = new bool[verts.Length];
+          foreach (int i in mesh.GetIndices(0)) referenced[i] = true;
+          float worst = 1f;
+          for (int i = 0; i < verts.Length; i++) {
+            if (!referenced[i]) continue;
+            worst = Mathf.Min(worst, Vector3.Dot(normals[i], verts[i].normalized));
+          }
+          // Analytic normals are radial to well under a degree; averaged face normals are not.
+          Assert.Greater(worst, 0.9995f, "feature normal deviates from the radial direction");
+        }
+      } finally {
+        Object.DestroyImmediate(mesh);
+      }
+    }
+
+    [Test]
+    public void FeatureNormalsSplitARotatedBoxAlongItsRealCreases() {
+      RequireFeatureNormals();
+      var mesh = new Mesh();
+      try {
+        using (LFContext.Push()) {
+          // A box that is not axis aligned: dual contouring produces skinny triangles along its edges,
+          // whose face normals are unreliable. The analytic gradient is not.
+          LFTree box = LFMath.Box(-Vector3.one * 0.5f, Vector3.one * 0.5f).RotateX(0.4f).RotateY(0.7f);
+          using (LFMeshJob job = LFMeshJob.Schedule(box, new Bounds(Vector3.zero, Vector3.one * 2f), 12f, false, true)) {
+            Assert.IsTrue(job.UsesFeatureNormals);
+            Assert.IsTrue(job.Complete(mesh, 30f));
+            Assert.Greater(job.GradientMilliseconds, 0.0);
+          }
+          var verts = mesh.vertices;
+          var normals = mesh.normals;
+          var referenced = new bool[verts.Length];
+          foreach (int i in mesh.GetIndices(0)) referenced[i] = true;
+
+          var directions = new System.Collections.Generic.List<Vector3>();
+          for (int i = 0; i < verts.Length; i++) {
+            if (!referenced[i]) continue;
+            Vector3 n = normals[i];
+            Assert.AreEqual(1f, n.magnitude, 1e-3f);
+            // Stepping off the surface along the normal must stay on the same face: the field's own
+            // gradient there agrees with the normal (within 1 degree).
+            Vector3 g = box.Gradient(verts[i] + 0.02f * n).normalized;
+            Assert.Greater(Vector3.Dot(g, n), 0.9998f, "normal disagrees with the field gradient at vertex " + i);
+            bool known = false;
+            foreach (Vector3 d in directions) if (Vector3.Dot(d, n) > 0.999f) { known = true; break; }
+            if (!known) directions.Add(n);
+          }
+          Assert.AreEqual(6, directions.Count, "a box has exactly six distinct normals");
+        }
+      } finally {
+        Object.DestroyImmediate(mesh);
+      }
+    }
+
     [Test]
     public void RenderSliceReturnsClosedContours() {
       using (LFContext.Push()) {

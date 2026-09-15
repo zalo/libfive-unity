@@ -56,6 +56,10 @@ target_sources(libfive PRIVATE
   "${LIBFIVE_SOURCE_DIR}/libfive/stdlib/stdlib_impl.cpp")
 target_include_directories(libfive PRIVATE "${LIBFIVE_SOURCE_DIR}/libfive/stdlib")
 
+# libfive-unity helpers (batched gradient evaluation for feature-based normals).
+target_sources(libfive PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/shim/libfive_unity.cpp")
+target_include_directories(libfive PRIVATE "${LIBFIVE_SOURCE_DIR}/libfive/include")
+
 # The separate libfive-stdlib target is redundant now; don't build it.
 if(TARGET libfive-stdlib)
   set_target_properties(libfive-stdlib PROPERTIES EXCLUDE_FROM_ALL TRUE)

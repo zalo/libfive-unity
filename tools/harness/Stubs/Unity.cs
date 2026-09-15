@@ -116,6 +116,7 @@ namespace Unity.Mathematics {
     public static float3 cross(float3 a, float3 b) => new float3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
     public static float dot(float3 a, float3 b) => a.x * b.x + a.y * b.y + a.z * b.z;
     public static float lengthsq(float3 a) => dot(a, a);
+    public static float rsqrt(float x) => 1f / MathF.Sqrt(x);
     public static float length(float3 a) => MathF.Sqrt(dot(a, a));
     public static float3 normalize(float3 a) => a / length(a);
     public static float cos(float v) => MathF.Cos(v);

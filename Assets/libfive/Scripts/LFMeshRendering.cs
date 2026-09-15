@@ -28,19 +28,41 @@ namespace libfivesharp {
       public libfive_region3 region;
       public float resolution;
       public int singleThreaded;
+      /// <summary>1 to also evaluate per-corner gradients for feature-based normals.</summary>
+      public int gradients;
+      public float sampleOffset;
+      /// <summary>[0] libfive_mesh*, [1] corner gradients (libfive_vec3*, from libfive_unity_mesh_corner_gradients) or null.</summary>
       public NativeArray<IntPtr> result;
+      /// <summary>Stopwatch ticks spent in [0] meshing and [1] gradient evaluation.</summary>
+      public NativeArray<long> ticks;
 
       public void Execute() {
-        if (tree == IntPtr.Zero) { result[0] = IntPtr.Zero; return; }
-        result[0] = singleThreaded != 0
+        if (tree == IntPtr.Zero) { result[0] = IntPtr.Zero; result[1] = IntPtr.Zero; return; }
+        long t0 = Stopwatch.GetTimestamp();
+        IntPtr mesh = singleThreaded != 0
           ? libfive.libfive_tree_render_mesh_st(tree, region, resolution)
           : libfive.libfive_tree_render_mesh(tree, region, resolution);
+        long t1 = Stopwatch.GetTimestamp();
+        result[0] = mesh;
+        result[1] = gradients != 0 && mesh != IntPtr.Zero
+          ? libfive.libfive_unity_mesh_corner_gradients(tree, mesh, sampleOffset)
+          : IntPtr.Zero;
+        ticks[0] = t1 - t0;
+        ticks[1] = Stopwatch.GetTimestamp() - t1;
       }
     }
+
+    /// <summary>
+    /// Where along the corner-to-centroid segment the gradient is sampled for feature normals (0 = at
+    /// the vertex, 1 = at the centroid). Large enough to land clearly on one side of a crease that the
+    /// vertex sits on, small enough to stay close to the vertex on curved surfaces.
+    /// </summary>
+    public static float CornerSampleOffset = 0.3f;
 
     LFTree tree;
     JobHandle handle;
     NativeArray<IntPtr> result;
+    NativeArray<long> ticks;
     readonly Stopwatch stopwatch = new Stopwatch();
     bool finished, disposed;
 
@@ -54,18 +76,32 @@ namespace libfivesharp {
     public bool IsFinished { get { return finished; } }
     /// <summary>Wall-clock time from scheduling to completion, in milliseconds.</summary>
     public double ElapsedMilliseconds { get { return stopwatch.Elapsed.TotalMilliseconds; } }
+    /// <summary>True if this job evaluates analytic corner gradients (plugin supports it and it was requested).</summary>
+    public bool UsesFeatureNormals { get; private set; }
+    /// <summary>Time libfive spent meshing (valid after completion).</summary>
+    public double RenderMilliseconds { get { return finished ? ticks[0] * 1000.0 / Stopwatch.Frequency : 0; } }
+    /// <summary>Time spent evaluating corner gradients on the worker (valid after completion; 0 without feature normals).</summary>
+    public double GradientMilliseconds { get { return finished ? ticks[1] * 1000.0 / Stopwatch.Frequency : 0; } }
+    /// <summary>Main-thread time spent building the Unity mesh in <see cref="Complete"/>.</summary>
+    public double BuildMilliseconds { get; private set; }
 
     LFMeshJob() { }
 
     /// <summary>Starts meshing <paramref name="tree"/> inside <paramref name="bounds"/> at <paramref name="resolution"/> cells per unit.</summary>
-    public static LFMeshJob Schedule(LFTree tree, Bounds bounds, float resolution, bool singleThreaded = false) {
+    /// <param name="featureNormals">Also evaluate the field gradient per triangle corner so
+    /// <see cref="Complete"/> can split normals along the shape's real creases (see <see cref="LFMeshBuilder"/>).
+    /// Ignored when the plugin binary lacks the helper.</param>
+    public static LFMeshJob Schedule(LFTree tree, Bounds bounds, float resolution, bool singleThreaded = false, bool featureNormals = true) {
       if (tree == null) throw new ArgumentNullException(nameof(tree));
       if (tree.IsDisposed) throw new ObjectDisposedException(nameof(tree));
+      bool gradients = featureNormals && LFNative.SupportsFeatureNormals;
       var job = new LFMeshJob {
         tree = tree,
         Bounds = bounds,
         Resolution = resolution,
-        result = new NativeArray<IntPtr>(1, Allocator.Persistent, NativeArrayOptions.ClearMemory)
+        UsesFeatureNormals = gradients,
+        result = new NativeArray<IntPtr>(2, Allocator.Persistent, NativeArrayOptions.ClearMemory),
+        ticks = new NativeArray<long>(2, Allocator.Persistent, NativeArrayOptions.ClearMemory)
       };
       job.stopwatch.Start();
       job.handle = new RenderJob {
@@ -73,7 +109,10 @@ namespace libfivesharp {
         region = LFTree.ToRegion(bounds),
         resolution = resolution,
         singleThreaded = singleThreaded ? 1 : 0,
-        result = job.result
+        gradients = gradients ? 1 : 0,
+        sampleOffset = CornerSampleOffset,
+        result = job.result,
+        ticks = job.ticks
       }.Schedule();
       JobHandle.ScheduleBatchedJobs();
       return job;
@@ -91,10 +130,15 @@ namespace libfivesharp {
       finished = true;
       stopwatch.Stop();
       IntPtr nativeMesh = result[0];
+      IntPtr gradients = result[1];
       result[0] = IntPtr.Zero;
+      result[1] = IntPtr.Zero;
+      long buildStart = Stopwatch.GetTimestamp();
       try {
-        return target != null && LFMeshBuilder.Build(nativeMesh, target, Bounds, vertexSplittingAngle);
+        return target != null && LFMeshBuilder.Build(nativeMesh, gradients, target, Bounds, vertexSplittingAngle);
       } finally {
+        BuildMilliseconds = (Stopwatch.GetTimestamp() - buildStart) * 1000.0 / Stopwatch.Frequency;
+        if (gradients != IntPtr.Zero) libfive.libfive_unity_free(gradients);
         if (nativeMesh != IntPtr.Zero) libfive.libfive_mesh_delete(nativeMesh);
         GC.KeepAlive(tree);
       }
@@ -109,9 +153,12 @@ namespace libfivesharp {
         finished = true;
         stopwatch.Stop();
         IntPtr nativeMesh = result[0];
+        IntPtr gradients = result[1];
+        if (gradients != IntPtr.Zero) libfive.libfive_unity_free(gradients);
         if (nativeMesh != IntPtr.Zero) libfive.libfive_mesh_delete(nativeMesh);
       }
       if (result.IsCreated) result.Dispose();
+      if (ticks.IsCreated) ticks.Dispose();
       GC.KeepAlive(tree);
       tree = null;
     }

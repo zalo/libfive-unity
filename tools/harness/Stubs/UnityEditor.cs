@@ -23,7 +23,7 @@ namespace UnityEditor {
     public SerializedProperty FindProperty(string n) => new SerializedProperty();
     public bool ApplyModifiedProperties() => false;
   }
-  public class SerializedProperty { public int intValue; public bool hasMultipleDifferentValues; public string tooltip = ""; }
+  public class SerializedProperty { public int intValue; public bool boolValue; public bool hasMultipleDifferentValues; public string tooltip = ""; }
   public class GUIContent { public GUIContent(string a) { } public GUIContent(string a, string b) { } }
   public class GUIStyle { }
   public static class EditorStyles { public static GUIStyle boldLabel = new GUIStyle(); }

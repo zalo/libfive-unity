@@ -28,6 +28,65 @@ namespace libfivesharp.Tests {
       }
     }
 
+    static bool Build(float3[] positions, uint[] indices, float3[] cornerGradients, Mesh mesh, float splitAngle) {
+      using (var p = new NativeArray<float3>(positions, Allocator.TempJob))
+      using (var i = new NativeArray<uint>(indices, Allocator.TempJob))
+      using (var g = new NativeArray<float3>(cornerGradients, Allocator.TempJob)) {
+        return LFMeshBuilder.Build(p, i, g, mesh, new Bounds(Vector3.zero, Vector3.one * 2f), splitAngle);
+      }
+    }
+
+    [Test]
+    public void CornerGradientsDriveBothSplittingAndNormals() {
+      // Radial (unnormalized) gradients, as if the cube's corners lay on a sphere: adjacent corners agree,
+      // so even a 30 degree threshold keeps 8 vertices, and the normals follow the field, not the faces.
+      var gradients = new float3[CubeIndices.Length];
+      for (int c = 0; c < gradients.Length; c++) gradients[c] = math.normalize(CubeVertices[CubeIndices[c]]) * 2.5f;
+      var mesh = new Mesh();
+      try {
+        Assert.IsTrue(Build(CubeVertices, CubeIndices, gradients, mesh, 30f));
+        Assert.IsTrue(LFMeshBuilder.LastUsedFeatureNormals);
+        Assert.AreEqual(8, mesh.vertexCount);
+        var verts = mesh.vertices;
+        var normals = mesh.normals;
+        for (int i = 0; i < verts.Length; i++) {
+          Assert.AreEqual(1f, normals[i].magnitude, 1e-4f);
+          Assert.Greater(Vector3.Dot(normals[i], verts[i].normalized), 0.9999f);
+        }
+        // Gradients equal to the face normals reproduce the geometric result exactly.
+        for (int c = 0; c < gradients.Length; c++) {
+          int t = c / 3;
+          float3 a = CubeVertices[CubeIndices[3 * t]], b = CubeVertices[CubeIndices[3 * t + 1]], d = CubeVertices[CubeIndices[3 * t + 2]];
+          gradients[c] = math.cross(b - a, d - a);
+        }
+        Assert.IsTrue(Build(CubeVertices, CubeIndices, gradients, mesh, 30f));
+        Assert.AreEqual(24, mesh.vertexCount);
+      } finally { Object.DestroyImmediate(mesh); }
+    }
+
+    [Test]
+    public void InvalidGradientsFallBackToFaceNormals() {
+      var gradients = new float3[CubeIndices.Length];
+      for (int c = 0; c < gradients.Length; c++) {
+        gradients[c] = (c % 3) == 0 ? float3.zero : (c % 3) == 1 ? new float3(float.NaN, 0f, 0f) : new float3(float.PositiveInfinity, 1f, 0f);
+      }
+      var mesh = new Mesh();
+      try {
+        Assert.IsTrue(Build(CubeVertices, CubeIndices, gradients, mesh, 30f));
+        Assert.AreEqual(24, mesh.vertexCount);
+        var verts = mesh.vertices;
+        var normals = mesh.normals;
+        var indices = mesh.GetIndices(0);
+        for (int t = 0; t < indices.Length; t += 3) {
+          Vector3 a = verts[indices[t]], b = verts[indices[t + 1]], c = verts[indices[t + 2]];
+          Vector3 faceNormal = Vector3.Cross(b - a, c - a).normalized;
+          for (int k = 0; k < 3; k++) {
+            Assert.AreEqual(1f, Vector3.Dot(normals[indices[t + k]], faceNormal), 1e-4f, "invalid gradient should fall back to the face normal");
+          }
+        }
+      } finally { Object.DestroyImmediate(mesh); }
+    }
+
     [Test]
     public void SmoothCubeKeepsEightVertices() {
       var mesh = new Mesh();

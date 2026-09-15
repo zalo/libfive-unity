@@ -7,6 +7,7 @@ namespace libfivesharp {
   /// <summary>Information about the loaded native libfive binary.</summary>
   public static class LFNative {
     static bool probed, available;
+    static bool helpersProbed, helpers;
     static string version = "", revision = "", branch = "";
 
     /// <summary>True if the native library could be loaded and called.</summary>
@@ -16,6 +17,27 @@ namespace libfivesharp {
     /// <summary>Short git hash of the native build (trailing '+' if it had local edits).</summary>
     public static string Revision { get { Probe(); return revision; } }
     public static string Branch { get { Probe(); return branch; } }
+
+    /// <summary>
+    /// True if the plugin binary includes the libfive-unity helpers (batched gradients), which enable
+    /// feature-based normal splitting. Older binaries fall back to geometric face normals.
+    /// </summary>
+    public static bool SupportsFeatureNormals {
+      get {
+        if (!helpersProbed) {
+          helpersProbed = true;
+          if (IsAvailable) {
+            try {
+              libfive.libfive_unity_gradients(IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero);
+              helpers = true;
+            } catch (EntryPointNotFoundException) {
+              helpers = false;
+            }
+          }
+        }
+        return helpers;
+      }
+    }
 
     static void Probe() {
       if (probed) return;
@@ -394,21 +416,48 @@ namespace libfivesharp {
     /// <param name="resolution">Octree cells per unit length; e.g. 16 gives ~1/16 unit cells.</param>
     /// <param name="vertexSplittingAngle">Edges whose faces meet at more than this angle (degrees) get
     /// split normals. 180 keeps everything smooth.</param>
-    public bool RenderMesh(Mesh target, Bounds bounds, float resolution = 12f, float vertexSplittingAngle = 180f) {
+    /// <param name="featureNormals">Derive normals (and the split decision) from the field's analytic
+    /// gradient sampled per triangle corner instead of from face normals. See <see cref="LFMeshBuilder"/>.</param>
+    public bool RenderMesh(Mesh target, Bounds bounds, float resolution = 12f, float vertexSplittingAngle = 180f, bool featureNormals = true) {
       if (target == null) throw new ArgumentNullException(nameof(target));
       IntPtr nativeMesh = RenderMeshNative(bounds, resolution);
+      IntPtr gradients = IntPtr.Zero;
       try {
-        return LFMeshBuilder.Build(nativeMesh, target, bounds, vertexSplittingAngle);
+        if (featureNormals && nativeMesh != IntPtr.Zero && LFNative.SupportsFeatureNormals) {
+          gradients = libfive.libfive_unity_mesh_corner_gradients(handle, nativeMesh, LFMeshJob.CornerSampleOffset);
+        }
+        return LFMeshBuilder.Build(nativeMesh, gradients, target, bounds, vertexSplittingAngle);
       } finally {
+        if (gradients != IntPtr.Zero) libfive.libfive_unity_free(gradients);
         if (nativeMesh != IntPtr.Zero) libfive.libfive_mesh_delete(nativeMesh);
       }
     }
 
     /// <summary>Convenience overload that allocates a new Mesh.</summary>
-    public Mesh RenderMesh(Bounds bounds, float resolution = 12f, float vertexSplittingAngle = 180f) {
+    public Mesh RenderMesh(Bounds bounds, float resolution = 12f, float vertexSplittingAngle = 180f, bool featureNormals = true) {
       Mesh mesh = new Mesh { name = "libfive mesh" };
-      RenderMesh(mesh, bounds, resolution, vertexSplittingAngle);
+      RenderMesh(mesh, bounds, resolution, vertexSplittingAngle, featureNormals);
       return mesh;
+    }
+
+    /// <summary>
+    /// Gradient of the field at many points in one native call (raw, not normalized). Falls back to
+    /// per-point evaluation when the plugin lacks the batched helper.
+    /// </summary>
+    public unsafe Vector3[] Gradient(Vector3[] points) {
+      ThrowIfDisposed();
+      if (points == null) throw new ArgumentNullException(nameof(points));
+      var result = new Vector3[points.Length];
+      if (points.Length == 0) return result;
+      if (!LFNative.SupportsFeatureNormals) {
+        for (int i = 0; i < points.Length; i++) result[i] = Gradient(points[i]);
+        return result;
+      }
+      fixed (Vector3* src = points)
+      fixed (Vector3* dst = result) {
+        libfive.libfive_unity_gradients(handle, (IntPtr)src, (uint)points.Length, (IntPtr)dst);
+      }
+      return result;
     }
 
     /// <summary>Renders directly to a binary STL file using libfive's own writer.</summary>

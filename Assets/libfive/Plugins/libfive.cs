@@ -317,6 +317,22 @@ namespace libfivesharp.libFiveInternal {
     public static extern void libfive_evaluator_delete(IntPtr evaluator);
     #endregion
 
+    #region libfive-unity helpers (native/shim/libfive_unity.cpp, compiled into the plugin)
+    /// <summary>Gradient of the tree at <paramref name="count"/> points (libfive_vec3 arrays). Returns the number evaluated.</summary>
+    [DllImport(LibraryName, EntryPoint = "libfive_unity_gradients")]
+    public static extern uint libfive_unity_gradients(IntPtr tree, IntPtr points, uint count, IntPtr outGradients);
+
+    /// <summary>
+    /// Gradient at every triangle corner of a libfive_mesh, sampled <paramref name="nudge"/> of the way from the
+    /// corner towards the triangle centroid. Returns 3 * tri_count libfive_vec3 (free with libfive_unity_free) or null.
+    /// </summary>
+    [DllImport(LibraryName, EntryPoint = "libfive_unity_mesh_corner_gradients")]
+    public static extern IntPtr libfive_unity_mesh_corner_gradients(IntPtr tree, IntPtr mesh, float nudge);
+
+    [DllImport(LibraryName, EntryPoint = "libfive_unity_free")]
+    public static extern void libfive_unity_free(IntPtr p);
+    #endregion
+
     #region Version info (static strings; do not free)
     [DllImport(LibraryName, EntryPoint = "libfive_git_version")]
     public static extern IntPtr libfive_git_version();
