@@ -1,5 +1,5 @@
 {
-    "name": "libfive",
+    "name": "libfivesharp",
     "rootNamespace": "libfivesharp",
     "references": [
         "Unity.Burst",

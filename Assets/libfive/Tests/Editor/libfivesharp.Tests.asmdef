@@ -1,9 +1,9 @@
 {
-    "name": "libfive.Tests",
+    "name": "libfivesharp.Tests",
     "rootNamespace": "libfivesharp.Tests",
     "references": [
-        "libfive",
-        "libfive.Editor",
+        "libfivesharp",
+        "libfivesharp.Editor",
         "Unity.Collections",
         "Unity.Mathematics",
         "UnityEngine.TestRunner",

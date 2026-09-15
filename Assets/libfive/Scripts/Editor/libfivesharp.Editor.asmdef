@@ -1,8 +1,8 @@
 {
-    "name": "libfive.Editor",
+    "name": "libfivesharp.Editor",
     "rootNamespace": "libfivesharp",
     "references": [
-        "libfive"
+        "libfivesharp"
     ],
     "includePlatforms": [
         "Editor"
