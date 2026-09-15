@@ -109,7 +109,8 @@ and without `-march=native`, so the binaries run on any x86_64 machine.
 
 ## Continuous integration
 
-* Both workflows run on every push to every branch (and on pull requests from forks).
+* Both workflows run on every push to every branch (and on pull requests from forks). Native jobs cache
+  vcpkg dependencies and libfive object files (sccache), so only the first build on a branch is slow.
 * **Unity** workflow: EditMode tests (`Assets/libfive/Tests`) and standalone player builds via
   [GameCI](https://game.ci), uploaded as run artifacts. It needs a Unity license in the repository
   secrets (`UNITY_LICENSE`, or `UNITY_EMAIL` + `UNITY_PASSWORD` [+ `UNITY_SERIAL`]) and skips itself
