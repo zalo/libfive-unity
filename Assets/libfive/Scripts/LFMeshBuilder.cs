@@ -138,6 +138,10 @@ namespace libfivesharp {
         NativeArray<Vertex> outVertices = data.GetVertexData<Vertex>(0);
         NativeArray<uint> outIndices = data.GetIndexData<uint>();
 
+        // The two jobs only read the shared inputs, but they are chained (and each handle is
+        // completed explicitly) so the collections safety system registers both as finished
+        // before the caller disposes the input arrays: completing only a combined handle leaves
+        // the readers marked as pending.
         JobHandle remap = new RemapIndicesJob {
           indices = indices, cornerGroup = cornerGroup, extraBase = extraBase, vertexCount = vertexCount,
           outIndices = outIndices
@@ -146,8 +150,9 @@ namespace libfivesharp {
           positions = positions, indices = indices, faceNormals = faceNormals, start = start,
           adjacency = adjacency, cornerGroup = cornerGroup, extraBase = extraBase, vertexCount = vertexCount,
           outVertices = outVertices
-        }.Schedule(vertexCount, 64);
-        JobHandle.CombineDependencies(remap, write).Complete();
+        }.Schedule(vertexCount, 64, remap);
+        write.Complete();
+        remap.Complete();
 
         data.subMeshCount = 1;
         data.SetSubMesh(0, new SubMeshDescriptor(0, cornerCount, MeshTopology.Triangles) {
