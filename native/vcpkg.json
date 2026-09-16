@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "libfive-unity-native",
+  "version-string": "0.0.0",
+  "description": "Dependencies for building the libfive plugin binary used by libfive-unity",
+  "dependencies": [
+    "eigen3",
+    "libpng",
+    "boost-algorithm",
+    "boost-bimap",
+    "boost-container",
+    "boost-functional",
+    "boost-interval",
+    "boost-lockfree",
+    "boost-math"
+  ],
+  "builtin-baseline": "0c8f465c549616e897a34b9393054931fda6339c"
+}

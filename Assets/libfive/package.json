@@ -1,0 +1,29 @@
+{
+  "name": "com.zalo.libfive-unity",
+  "version": "1.0.0",
+  "displayName": "libfive for Unity",
+  "description": "C# wrapper for the libfive implicit-surface CAD kernel: signed-distance expression trees with libfive's standard library, dual-contouring meshing on worker threads, Burst smoothing-group normals, and a hierarchy-based CSG editor (LFShape).",
+  "unity": "6000.3",
+  "keywords": [
+    "libfive",
+    "csg",
+    "sdf",
+    "implicit",
+    "procedural",
+    "mesh"
+  ],
+  "author": {
+    "name": "Johnathon Selstad",
+    "url": "https://github.com/zalo"
+  },
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zalo/libfive-unity.git"
+  },
+  "dependencies": {
+    "com.unity.burst": "1.8.30",
+    "com.unity.collections": "2.6.8",
+    "com.unity.mathematics": "1.3.3"
+  }
+}

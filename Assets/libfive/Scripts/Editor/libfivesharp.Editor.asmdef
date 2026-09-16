@@ -1,0 +1,18 @@
+{
+    "name": "libfivesharp.Editor",
+    "rootNamespace": "libfivesharp",
+    "references": [
+        "libfivesharp"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
