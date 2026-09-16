@@ -9,9 +9,9 @@ namespace libfivesharp {
   public class LibFiveExample : MonoBehaviour {
     [Tooltip("Octree cells per unit of length.")]
     [Range(4f, 64f)]
-    public float resolution = 15f;
+    public float resolution = 12f;
 
-    [Tooltip("Split vertex normals along edges sharper than 25 degrees so the cut edges stay crisp.")]
+    [Tooltip("Split vertex normals along creases sharper than 10 degrees so the cut edges stay crisp.")]
     public bool sharpEdges = true;
 
     [Tooltip("Animate the cylinder radius.")]
@@ -42,7 +42,7 @@ namespace libfivesharp {
     void Update() {
       // Pick up the previous frame's result (or block for it, if we were asked to re-mesh every frame).
       if (job != null && job.IsCompleted) {
-        job.Complete(mesh, sharpEdges ? 25f : 180f);
+        job.Complete(mesh, sharpEdges ? 10f : 180f);
         job.Dispose();
         job = null;
         shape.Dispose();

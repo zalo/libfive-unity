@@ -199,7 +199,6 @@ GameObject:
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 523134659}
   m_Enabled: 1
   m_EditorHideFlags: 0
@@ -207,12 +206,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   op: 211
+  amount: 0
+  text: libfive
+  lastOp: 211
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
-  vertexSplittingAngle: 25
-  resolution: 8
-  renderOnAnotherThread: 0
-  localTransformHash: 4
+  vertexSplittingAngle: 10
+  featureNormals: 1
+  resolution: 12
+  AsyncRender: 1
 --- !u!4 &523134661
 Transform:
   m_ObjectHideFlags: 0
@@ -259,8 +261,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb6ff479739133e4795a853fef8f486b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resolution: 15
+  resolution: 12
   sharpEdges: 1
+  animate: 1
 --- !u!4 &718740216
 Transform:
   m_ObjectHideFlags: 0
@@ -349,7 +352,6 @@ Transform:
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 785370807}
   m_Enabled: 1
   m_EditorHideFlags: 0
@@ -357,12 +359,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   op: 3
+  amount: 0
+  text: libfive
+  lastOp: 3
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
-  vertexSplittingAngle: 180
-  resolution: 4
-  renderOnAnotherThread: 0
-  localTransformHash: 4
+  vertexSplittingAngle: 10
+  featureNormals: 1
+  resolution: 12
+  AsyncRender: 1
 --- !u!1 &834083555
 GameObject:
   m_ObjectHideFlags: 0
@@ -473,7 +478,6 @@ Transform:
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1405764199}
   m_Enabled: 1
   m_EditorHideFlags: 0
@@ -481,12 +485,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   op: 1
+  amount: 0
+  text: libfive
+  lastOp: 1
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
-  vertexSplittingAngle: 180
-  resolution: 4
-  renderOnAnotherThread: 0
-  localTransformHash: 3.9142137
+  vertexSplittingAngle: 10
+  featureNormals: 1
+  resolution: 12
+  AsyncRender: 1
 --- !u!1 &1547208759
 GameObject:
   m_ObjectHideFlags: 0
@@ -520,7 +527,6 @@ Transform:
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1547208759}
   m_Enabled: 1
   m_EditorHideFlags: 0
@@ -528,12 +534,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   op: 1
+  amount: 0
+  text: libfive
+  lastOp: 1
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
-  vertexSplittingAngle: 180
-  resolution: 4
-  renderOnAnotherThread: 0
-  localTransformHash: 3.9142137
+  vertexSplittingAngle: 10
+  featureNormals: 1
+  resolution: 12
+  AsyncRender: 1
 --- !u!1 &1557883447
 GameObject:
   m_ObjectHideFlags: 0
@@ -567,7 +576,6 @@ Transform:
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1557883447}
   m_Enabled: 1
   m_EditorHideFlags: 0
@@ -575,9 +583,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   op: 1
+  amount: 0
+  text: libfive
+  lastOp: 1
   material: {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   boundsSize: 2
-  vertexSplittingAngle: 180
-  resolution: 4
-  renderOnAnotherThread: 0
-  localTransformHash: 3.5
+  vertexSplittingAngle: 10
+  featureNormals: 1
+  resolution: 12
+  AsyncRender: 1
